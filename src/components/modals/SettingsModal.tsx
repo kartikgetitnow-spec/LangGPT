@@ -103,7 +103,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(conversationsData, null, 2));
     const downloadAnchor = document.createElement("a");
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `chatgpt_export_${new Date().toISOString().slice(0, 10)}.json`);
+    downloadAnchor.setAttribute("download", `langgpt_export_${new Date().toISOString().slice(0, 10)}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -195,7 +195,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <h3 className="font-medium text-zinc-900 dark:text-zinc-100 mb-1">Theme</h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-                    Choose how the ChatGPT interface looks to you.
+                    Choose how the LangGPT interface looks to you.
                   </p>
                   <div className="grid grid-cols-3 gap-2">
                     <button
@@ -409,15 +409,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === "about" && (
               <div className="space-y-3">
                 <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  ChatGPT Frontend Clone + LangChain Gemini
+                  LangGPT (Next.js 16 + LangChain + Gemini)
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  Engineered with pixel-perfect attention to OpenAI ChatGPT&apos;s UI patterns, powered by
+                  Engineered with pixel-perfect attention to modern AI UI patterns, powered by
                   LangChain TypeScript, Google Gemini 2.5 streaming, multi-turn session memory, and
                   Local DB dynamic narrative context awareness.
                 </p>
                 <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                  Version 1.3.0 • Narrative Profile Context Active
+                  Version 1.4.0 • LangGPT Active
                 </div>
               </div>
             )}

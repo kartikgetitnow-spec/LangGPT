@@ -47,7 +47,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: conversation?.title || "ChatGPT Conversation",
+          title: conversation?.title || "LangGPT Conversation",
           text: `Check out this conversation: ${conversation?.title}`,
           url: window.location.href,
         });

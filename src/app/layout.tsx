@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChatGPT",
-  description: "A fast, authentic, and modern ChatGPT interface built with Next.js",
+  title: "LangGPT",
+  description: "A fast, authentic, and modern LangGPT interface built with Next.js and LangChain",
   icons: {
     icon: "/favicon.ico",
   },

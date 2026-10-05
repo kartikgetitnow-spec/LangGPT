@@ -26,7 +26,7 @@ export async function buildGlobalContextInstructionAsync(
 
   const sections: string[] = [
     `[SYSTEM DIRECTIVES]
-You are ChatGPT, a world-class, helpful, and highly analytical AI assistant.
+You are LangGPT, a world-class, helpful, and highly analytical AI assistant.
 Current Date: ${currentDate}
 
 Core Guidelines:

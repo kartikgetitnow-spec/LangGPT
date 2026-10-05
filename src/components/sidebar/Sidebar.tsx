@@ -123,7 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center">
               <Sparkles className="w-3 h-3 fill-current" />
             </div>
-            <span className="flex-1 text-left">ChatGPT</span>
+            <span className="flex-1 text-left">LangGPT</span>
             <SquarePen className="w-4 h-4 text-zinc-400" />
           </button>
         </div>

@@ -73,7 +73,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           {/* Header Name */}
           <div className="flex items-center gap-2 mb-1">
             <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-              {isUser ? "You" : "ChatGPT"}
+              {isUser ? "You" : "LangGPT"}
             </span>
             {message.model && !isUser && (
               <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">

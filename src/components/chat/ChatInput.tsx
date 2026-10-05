@@ -251,9 +251,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       </div>
 
-      {/* ChatGPT Disclaimer */}
+      {/* LangGPT Disclaimer */}
       <div className="text-center text-[11.5px] text-zinc-500 dark:text-zinc-400 mt-2">
-        ChatGPT can make mistakes. Check important info.
+        LangGPT can make mistakes. Check important info.
       </div>
     </div>
   );

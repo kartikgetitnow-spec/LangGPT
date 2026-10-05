@@ -2,7 +2,7 @@
  * ==============================================================================
  * STEP 8: HTTP API CONTROLLER (/api/chat)
  * ==============================================================================
- * The HTTP boundary layer that handles client requests from the ChatGPT frontend.
+ * The HTTP boundary layer that handles client requests from the LangGPT frontend.
  * 
  * RESPONSIBILITIES:
  * 1. Request Parsing & Validation: Parses `conversationId`, `messages`, and `model`.
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
           controller.enqueue(
             encoder.encode(
               "⚠️ **Google Gemini API Key Required**\n\n" +
-              "To connect this ChatGPT interface to **Google Gemini via LangChain**:\n\n" +
+              "To connect this LangGPT interface to **Google Gemini via LangChain**:\n\n" +
               "1. Add your API key to `.env.local`:\n" +
               "```env\nGOOGLE_API_KEY=\"your_gemini_api_key_here\"\n```\n" +
               "2. Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).\n" +

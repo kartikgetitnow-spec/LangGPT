@@ -62,7 +62,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-[#212121]">
-      {/* ChatGPT Collapsible Sidebar */}
+      {/* LangGPT Collapsible Sidebar */}
       <Sidebar
         conversations={conversations}
         activeId={currentConversationId}
