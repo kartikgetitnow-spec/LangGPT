@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
 
-// Helper to safely extract text from any LangChain message chunk
+// Safely extract string content from LangChain message chunks
 function extractChunkText(chunk: unknown): string {
   if (!chunk || typeof chunk !== "object") return "";
   const content = (chunk as { content?: unknown }).content;
@@ -33,36 +33,36 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
 
-    // If API Key is not set, stream back a clear instruction message
+    // If API key is not yet set in .env.local, return a helpful setup guide
     if (!apiKey) {
       const encoder = new TextEncoder();
-      const warningStream = new ReadableStream({
+      const setupGuideStream = new ReadableStream({
         start(controller) {
           controller.enqueue(
             encoder.encode(
-              "⚠️ **Gemini API Key Required**\n\n" +
-              "To connect this ChatGPT interface to **Google Gemini via LangChain**:\n\n" +
-              "1. Create a `.env.local` file in the project root:\n" +
+              "⚠️ **Google Gemini API Key Required**\n\n" +
+              "To chat with Gemini, please add your API key:\n\n" +
+              "1. Create a `.env.local` file in your project root:\n" +
               "```env\nGOOGLE_API_KEY=\"your_gemini_api_key_here\"\n```\n" +
-              "2. Get your free API key at [Google AI Studio](https://aistudio.google.com/app/apikey).\n" +
-              "3. Save the file and restart the development server (`npm run dev`)."
+              "2. Get your free key from [Google AI Studio](https://aistudio.google.com/app/apikey).\n" +
+              "3. Restart the dev server (`npm run dev`) and you're good to go!"
             )
           );
           controller.close();
         },
       });
 
-      return new Response(warningStream, {
+      return new Response(setupGuideStream, {
         headers: {
           "Content-Type": "text/plain; charset=utf-8",
         },
       });
     }
 
-    // Determine model name from user selection
+    // Map requested model to supported Gemini models
     let geminiModel = "gemini-1.5-flash";
     if (model) {
-      if (model.includes("pro") || model.includes("o1")) {
+      if (model.includes("pro")) {
         geminiModel = "gemini-1.5-pro";
       } else if (model.includes("2.0")) {
         geminiModel = "gemini-2.0-flash";
@@ -71,13 +71,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Convert frontend messages to LangChain BaseMessage objects
+    // Convert frontend messages to LangChain messages
     const langChainMessages: BaseMessage[] = [];
 
-    // Optional system prompt to instruct Gemini to act as a helpful AI assistant
+    // System instruction
     langChainMessages.push(
       new SystemMessage(
-        "You are ChatGPT, a helpful, thoughtful, and highly capable AI assistant. Answer clearly with markdown formatting."
+        "You are ChatGPT, an advanced and helpful AI assistant powered by Google Gemini. Use Markdown formatting for your responses, including code blocks with language indicators when sharing code."
       )
     );
 
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Initialize LangChain's Google GenAI chat model
+    // Initialize LangChain Gemini Chat Model
     const llm = new ChatGoogleGenerativeAI({
       model: geminiModel,
       apiKey,
@@ -102,11 +102,11 @@ export async function POST(req: NextRequest) {
       maxOutputTokens: 4096,
     });
 
-    // Stream responses using LangChain
+    // Stream tokens from LangChain
     const stream = await llm.stream(langChainMessages);
     const encoder = new TextEncoder();
 
-    // Stream chunks to the frontend in real time
+    // Stream directly to the browser
     const responseStream = new ReadableStream({
       async start(controller) {
         try {
@@ -117,10 +117,10 @@ export async function POST(req: NextRequest) {
             }
           }
           controller.close();
-        } catch (streamError: unknown) {
-          const errMsg = streamError instanceof Error ? streamError.message : String(streamError);
+        } catch (streamErr: unknown) {
+          const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
           controller.enqueue(
-            encoder.encode(`\n\n⚠️ **Gemini Streaming Error**: ${errMsg}`)
+            encoder.encode(`\n\n⚠️ **Gemini Error**: ${errMsg}`)
           );
           controller.close();
         }
