@@ -28,6 +28,7 @@ export interface StreamChatParams {
  * Supports both plain text streams and Server-Sent Events (SSE `data: ...`).
  */
 export async function streamChatResponse({
+  conversationId,
   messages,
   model,
   onChunk,
@@ -42,6 +43,7 @@ export async function streamChatResponse({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        conversationId,
         messages,
         model,
       }),
