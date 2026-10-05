@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { Conversation, Message, Attachment } from "@/types/chat";
 import { AVAILABLE_MODELS } from "@/lib/mockData";
 import { streamChatResponse } from "@/services/chatService";
@@ -10,12 +11,28 @@ const CURRENT_CONV_KEY = "chatgpt_active_id";
 const MODEL_KEY = "chatgpt_selected_model";
 
 export function useChat() {
+  const { status } = useSession();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Load conversations from server (accelerated by Redis) when authenticated
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetch("/api/conversations")
+        .then((res) => (res.ok ? res.json() : []))
+        .then((serverConvs: Conversation[]) => {
+          if (Array.isArray(serverConvs) && serverConvs.length > 0) {
+            setConversations(serverConvs);
+            setCurrentConversationId((prev) => (prev && serverConvs.some((c) => c.id === prev) ? prev : serverConvs[0].id));
+          }
+        })
+        .catch((err) => console.warn("Failed to load server conversations:", err));
+    }
+  }, [status]);
 
   // Safely load from localStorage on client mount (prevents SSR hydration mismatch)
   useEffect(() => {
@@ -124,6 +141,8 @@ export function useChat() {
         }
         return filtered;
       });
+
+      fetch(`/api/conversations/${id}`, { method: "DELETE" }).catch(() => {});
     },
     [currentConversationId]
   );
@@ -136,6 +155,12 @@ export function useChat() {
     setConversations((prev) =>
       prev.map((c) => (c.id === id ? { ...c, title: newTitle.trim(), updatedAt: new Date().toISOString() } : c))
     );
+
+    fetch(`/api/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newTitle.trim() }),
+    }).catch(() => {});
   }, []);
 
   /**
@@ -145,6 +170,12 @@ export function useChat() {
     setConversations((prev) =>
       prev.map((c) => (c.id === id ? { ...c, isPinned: !c.isPinned } : c))
     );
+
+    fetch(`/api/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ togglePin: true }),
+    }).catch(() => {});
   }, []);
 
   /**

@@ -12,17 +12,18 @@ datasource db {
 
 // NextAuth & User Models
 model User {
-  id            String          @id @default(cuid())
-  name          String?
-  email         String?         @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?         // Hashed password for credentials auth
-  accounts      Account[]
-  sessions      Session[]
+  id             String          @id @default(cuid())
+  name           String?
+  email          String?         @unique
+  emailVerified  DateTime?
+  image          String?
+  password       String?         // Hashed password for credentials auth
+  accounts       Account[]
+  sessions       Session[]
   profileContext ProfileContext?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  conversations  Conversation[]  // All chats owned by this user
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 model Account {
@@ -79,4 +80,51 @@ model ProfileContext {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   profileText String   @db.Text
   updatedAt   DateTime @updatedAt
+}
+
+// Per-User Conversation / Chat Session Model
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String    // Scoped strictly to the authenticated user
+  title     String    @default("New Chat")
+  modelId   String    @default("gemini-2.5-flash")
+  isPinned  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@index([userId])
+  @@index([userId, updatedAt])
+}
+
+// Chat Message Model
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           String       // "user" | "assistant" | "system"
+  content        String       @db.Text
+  model          String?
+  createdAt      DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments    Attachment[]
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+}
+
+// Message Attachment Model
+model Attachment {
+  id        String   @id @default(cuid())
+  messageId String
+  name      String
+  size      Int
+  type      String
+  url       String?  @db.Text
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
 }

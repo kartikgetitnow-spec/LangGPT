@@ -18,6 +18,7 @@ import { memoryManager } from "../memory/memoryManager";
 import { ModelFactory } from "../models/modelFactory";
 import { PromptBuilder } from "../prompts/promptTemplates";
 import { ProfileUpdater } from "../context/profileUpdater";
+import { ChatRepository } from "../db/chatRepository";
 
 export interface OrchestrationParams {
   conversationId?: string;
@@ -109,7 +110,20 @@ export class ConversationOrchestrator {
               fullAssistantResponse
             );
 
-            // 8. BACKGROUND: Ask LLM if anything is saveable to update the user's profile paragraph
+            // 8. Persist to Redis & PostgreSQL database per session per user
+            if (userId) {
+              ChatRepository.saveTurn({
+                conversationId,
+                userId,
+                userPrompt,
+                assistantReply: fullAssistantResponse,
+                model,
+              }).catch((err) => {
+                console.warn("DB/Redis chat persist error:", err);
+              });
+            }
+
+            // 9. BACKGROUND: Ask LLM if anything is saveable to update user profile
             ProfileUpdater.evaluateAndUpdate(userPrompt, fullAssistantResponse, userId).catch((err) => {
               console.warn("Background profile updater error:", err);
             });
