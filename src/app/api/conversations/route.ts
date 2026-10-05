@@ -1,15 +1,16 @@
 /**
  * ==============================================================================
- * API: /api/conversations
+ * API PROXY: /api/conversations -> Node.js Express Backend
  * ==============================================================================
- * Manages user's conversation sessions with Redis caching and PostgreSQL persistence.
+ * Proxies conversation list queries and batch deletions to Node.js backend.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { ChatRepository } from "@/server/db/chatRepository";
 
-export async function GET() {
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
+
+export async function GET(req: NextRequest) {
   try {
     const session = await auth().catch(() => null);
     if (!session || !session.user) {
@@ -17,15 +18,25 @@ export async function GET() {
     }
 
     const userId = session.user.id || session.user.email || "";
-    const conversations = await ChatRepository.getUserConversations(userId);
-    return NextResponse.json(conversations);
+    const backendRes = await fetch(`${BACKEND_URL}/api/conversations`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+        cookie: req.headers.get("cookie") || "",
+      },
+      cache: "no-store",
+    });
+
+    const data = await backendRes.json();
+    return NextResponse.json(data, { status: backendRes.status });
   } catch (error) {
-    console.error("Error in GET /api/conversations:", error);
-    return NextResponse.json({ error: "Failed to fetch conversations" }, { status: 500 });
+    console.error("Proxy error in GET /api/conversations:", error);
+    return NextResponse.json({ error: "Failed to fetch conversations from backend" }, { status: 502 });
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   try {
     const session = await auth().catch(() => null);
     if (!session || !session.user) {
@@ -33,10 +44,19 @@ export async function DELETE() {
     }
 
     const userId = session.user.id || session.user.email || "";
-    await ChatRepository.clearAllConversations(userId);
-    return NextResponse.json({ success: true });
+    const backendRes = await fetch(`${BACKEND_URL}/api/conversations`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+        cookie: req.headers.get("cookie") || "",
+      },
+    });
+
+    const data = await backendRes.json();
+    return NextResponse.json(data, { status: backendRes.status });
   } catch (error) {
-    console.error("Error in DELETE /api/conversations:", error);
-    return NextResponse.json({ error: "Failed to clear conversations" }, { status: 500 });
+    console.error("Proxy error in DELETE /api/conversations:", error);
+    return NextResponse.json({ error: "Failed to clear conversations" }, { status: 502 });
   }
 }

@@ -1,17 +1,18 @@
 /**
  * ==============================================================================
- * API: /api/conversations/[id]
+ * API PROXY: /api/conversations/[id] -> Node.js Express Backend
  * ==============================================================================
- * Single conversation operations: retrieve messages, rename, pin, and delete.
- * Accelerated with Redis cache.
+ * Proxies single conversation operations (fetch messages, rename, pin, delete)
+ * to the Node.js Express server on port 5000.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { ChatRepository } from "@/server/db/chatRepository";
+
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -21,11 +22,22 @@ export async function GET(
     }
 
     const { id } = await params;
-    const messages = await ChatRepository.getConversationMessages(id);
-    return NextResponse.json(messages);
+    const userId = session.user.id || session.user.email || "";
+
+    const backendRes = await fetch(`${BACKEND_URL}/api/conversations/${encodeURIComponent(id)}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+        cookie: req.headers.get("cookie") || "",
+      },
+      cache: "no-store",
+    });
+
+    const data = await backendRes.json();
+    return NextResponse.json(data, { status: backendRes.status });
   } catch (error) {
-    console.error("Error in GET /api/conversations/[id]:", error);
-    return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
+    console.error("Proxy error in GET /api/conversations/[id]:", error);
+    return NextResponse.json({ error: "Failed to fetch messages from backend" }, { status: 502 });
   }
 }
 
@@ -43,25 +55,26 @@ export async function PATCH(
     const userId = session.user.id || session.user.email || "";
     const body = await req.json();
 
-    if (typeof body.title === "string") {
-      await ChatRepository.renameConversation(id, userId, body.title);
-      return NextResponse.json({ success: true, title: body.title });
-    }
+    const backendRes = await fetch(`${BACKEND_URL}/api/conversations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+        cookie: req.headers.get("cookie") || "",
+      },
+      body: JSON.stringify(body),
+    });
 
-    if (body.togglePin) {
-      const isPinned = await ChatRepository.togglePinConversation(id, userId);
-      return NextResponse.json({ success: true, isPinned });
-    }
-
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    const data = await backendRes.json();
+    return NextResponse.json(data, { status: backendRes.status });
   } catch (error) {
-    console.error("Error in PATCH /api/conversations/[id]:", error);
-    return NextResponse.json({ error: "Failed to update conversation" }, { status: 500 });
+    console.error("Proxy error in PATCH /api/conversations/[id]:", error);
+    return NextResponse.json({ error: "Failed to update conversation on backend" }, { status: 502 });
   }
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -72,10 +85,20 @@ export async function DELETE(
 
     const { id } = await params;
     const userId = session.user.id || session.user.email || "";
-    await ChatRepository.deleteConversation(id, userId);
-    return NextResponse.json({ success: true });
+
+    const backendRes = await fetch(`${BACKEND_URL}/api/conversations/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+        cookie: req.headers.get("cookie") || "",
+      },
+    });
+
+    const data = await backendRes.json();
+    return NextResponse.json(data, { status: backendRes.status });
   } catch (error) {
-    console.error("Error in DELETE /api/conversations/[id]:", error);
-    return NextResponse.json({ error: "Failed to delete conversation" }, { status: 500 });
+    console.error("Proxy error in DELETE /api/conversations/[id]:", error);
+    return NextResponse.json({ error: "Failed to delete conversation on backend" }, { status: 502 });
   }
 }

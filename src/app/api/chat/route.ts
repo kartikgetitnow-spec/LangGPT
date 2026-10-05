@@ -1,53 +1,19 @@
 /**
  * ==============================================================================
- * STEP 8: HTTP API CONTROLLER (/api/chat)
+ * API PROXY CONTROLLER: /api/chat -> Node.js Express Backend
  * ==============================================================================
- * The HTTP boundary layer that handles client requests from the LangGPT frontend.
- * 
- * RESPONSIBILITIES:
- * 1. Request Parsing & Validation: Parses `conversationId`, `messages`, and `model`.
- * 2. Auth Session Scoping: Extracts signed-in user ID for private context awareness.
- * 3. API Key Guard: Returns instructive markdown if `GOOGLE_API_KEY` is missing.
- * 4. Delegation: Hands off execution to `ConversationOrchestrator`.
- * 5. HTTP Headers: Configures streaming headers (no-cache, text/plain).
+ * Proxies chat requests to the dedicated Node.js Express server on port 5000.
+ * Injects authenticated NextAuth identity headers and streams the SSE response.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerConfig } from "@/server/config/env";
-import { ConversationOrchestrator } from "@/server/chains/conversationOrchestrator";
 import { auth } from "@/auth";
+
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
 
 export async function POST(req: NextRequest) {
   try {
-    const config = getServerConfig();
-
-    // 1. Check if Gemini API Key is configured
-    if (!config.googleApiKey) {
-      const encoder = new TextEncoder();
-      const setupWarningStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(
-            encoder.encode(
-              "⚠️ **Google Gemini API Key Required**\n\n" +
-              "To connect this LangGPT interface to **Google Gemini via LangChain**:\n\n" +
-              "1. Add your API key to `.env.local`:\n" +
-              "```env\nGOOGLE_API_KEY=\"your_gemini_api_key_here\"\n```\n" +
-              "2. Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).\n" +
-              "3. Save the file and restart the development server (`npm run dev`)."
-            )
-          );
-          controller.close();
-        },
-      });
-
-      return new Response(setupWarningStream, {
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-        },
-      });
-    }
-
-    // 2. Authentication & Authorization Guard: Reject unauthenticated users
+    // 1. Authenticate user session
     const session = await auth().catch(() => null);
     if (!session || !session.user) {
       return NextResponse.json(
@@ -59,29 +25,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Parse request payload
+    const userId = session.user.id || session.user.email || "";
+    const userEmail = session.user.email || "";
+    const userName = session.user.name || "";
     const body = await req.json();
-    const { conversationId, messages, model, userProfile } = body;
-    const userId = session.user.id || session.user.email || undefined;
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        { error: "Invalid request: messages array is required." },
-        { status: 400 }
-      );
-    }
-
-    // 3. Delegate to the Conversation Orchestrator pipeline
-    const stream = await ConversationOrchestrator.streamConversation({
-      conversationId: conversationId || "default-session",
-      messages,
-      model,
-      userProfile,
-      userId,
+    // 2. Forward request to dedicated Node.js Express backend
+    const backendRes = await fetch(`${BACKEND_URL}/api/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+        "x-user-email": userEmail,
+        "x-user-name": userName,
+        cookie: req.headers.get("cookie") || "",
+      },
+      body: JSON.stringify(body),
     });
 
-    // 4. Return the live stream to the client
-    return new Response(stream, {
+    if (!backendRes.ok) {
+      const errorText = await backendRes.text();
+      return new Response(errorText, {
+        status: backendRes.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // 3. Pipe backend streaming response directly to client
+    return new Response(backendRes.body, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache",
@@ -89,8 +60,11 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: unknown) {
-    const errorMsg = error instanceof Error ? error.message : "Internal Server Error";
-    console.error("Error handling /api/chat request:", error);
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
+    const errorMsg = error instanceof Error ? error.message : "Backend Gateway Error";
+    console.error("Proxy error in /api/chat:", error);
+    return NextResponse.json(
+      { error: `Backend service error: ${errorMsg}` },
+      { status: 502 }
+    );
   }
 }
