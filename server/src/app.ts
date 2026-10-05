@@ -14,6 +14,7 @@ import chatRoutes from "./routes/chatRoutes";
 import conversationRoutes from "./routes/conversationRoutes";
 import contextRoutes from "./routes/contextRoutes";
 import authRoutes from "./routes/authRoutes";
+import ragRoutes from "./routes/ragRoutes";
 
 export const app = express();
 
@@ -43,6 +44,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/context", contextRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/rag", ragRoutes);
 
 // Fallback 404
 app.use((_req, res) => {

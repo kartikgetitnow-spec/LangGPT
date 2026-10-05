@@ -41,3 +41,10 @@ data/*.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python & VectorDB
+__pycache__/
+*.py[cod]
+server/python/.venv/
+server/python/chroma_db/
+server/python/uploads/

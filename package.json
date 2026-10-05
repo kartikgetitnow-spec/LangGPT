@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n \"frontend,backend\" -c \"cyan,green\" \"npm run dev:client\" \"npm run dev:server\"",
+    "dev": "concurrently -k -n \"frontend,node,python\" -c \"cyan,green,yellow\" \"npm run dev:client\" \"npm run dev:server\" \"npm run dev:python\"",
     "dev:client": "next dev",
     "dev:server": "tsx watch server/src/index.ts",
+    "dev:python": "server/python/.venv/bin/python server/python/main.py",
     "build": "next build",
     "start": "next start",
     "start:server": "tsx server/src/index.ts",
