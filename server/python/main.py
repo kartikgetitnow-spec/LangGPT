@@ -1,6 +1,6 @@
-import os
-from typing import Optional
-from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, status
+import time
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -25,6 +25,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# HTTP Request Logging Middleware
+@app.middleware("http")
+async def log_requests_middleware(request: Request, call_next):
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    user_header = request.headers.get("x-user-id", "anonymous")
+    status_color = "\033[92m" if response.status_code < 400 else "\033[91m"
+    print(
+        f"\033[94m[FastAPI:HTTP]\033[0m {request.method} {request.url.path} -> "
+        f"{status_color}{response.status_code}\033[0m ({duration_ms:.1f}ms) | User: {user_header}"
+    )
+    return response
 
 class RAGQueryRequest(BaseModel):
     query: str

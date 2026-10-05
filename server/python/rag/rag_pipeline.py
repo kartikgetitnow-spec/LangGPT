@@ -38,13 +38,20 @@ class RAGPipeline:
             yield "⚠️ **Google Gemini API Key is missing** in `server/.env`. Please add `GOOGLE_API_KEY` to enable AI generation."
             return
 
-        # 1. Similarity search in ChromaDB
+        import time
+        from rag.logger import LangChainLoggingMiddleware
+
+        logging_middleware = LangChainLoggingMiddleware(trace_name="LangGPT-RAG-Chain")
+
+        # 1. Similarity search in ChromaDB with timing
+        retrieval_start = time.perf_counter()
         results = vector_store.similarity_search(
             query=query,
             user_id=user_id,
             conversation_id=conversation_id,
             top_k=top_k
         )
+        retrieval_ms = (time.perf_counter() - retrieval_start) * 1000
 
         context_parts = []
         sources = []
@@ -57,9 +64,18 @@ class RAGPipeline:
                 sources.append(fn)
                 context_parts.append(f"[Source: {fn} | Chunk {idx + 1}]\n{item['content']}")
 
+        # Log vector search results through middleware
+        logging_middleware.log_retriever_query(
+            query=query,
+            user_id=user_id,
+            results_count=len(results),
+            duration_ms=retrieval_ms,
+            sources=sources
+        )
+
         formatted_context = "\n\n---\n\n".join(context_parts) if context_parts else "No relevant documents found in the vector database."
 
-        # 2. Setup LangChain Chain
+        # 2. Setup LangChain Chain with logging callbacks
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -67,21 +83,26 @@ class RAGPipeline:
                 model=model_name or "gemini-2.5-flash",
                 google_api_key=GOOGLE_API_KEY,
                 streaming=True,
-                temperature=0.4
+                temperature=0.4,
+                callbacks=[logging_middleware]
             )
 
             prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
             chain = prompt | llm | StrOutputParser()
 
-            # 3. Stream generated response chunks
-            async for chunk in chain.astream({
-                "context": formatted_context,
-                "question": query
-            }):
+            # 3. Stream generated response chunks with callback configuration
+            async for chunk in chain.astream(
+                {
+                    "context": formatted_context,
+                    "question": query
+                },
+                config={"callbacks": [logging_middleware]}
+            ):
                 if chunk:
                     yield chunk
 
         except Exception as e:
+            await logging_middleware.on_chain_error(e)
             yield f"\n\n[Error generating RAG response: {str(e)}]"
 
 rag_pipeline = RAGPipeline()
