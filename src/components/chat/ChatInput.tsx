@@ -32,7 +32,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onClearInputPrompt,
   onOpenAuth,
 }) => {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isWebSearchActive, setIsWebSearchActive] = useState(false);
@@ -131,8 +131,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const canSubmit = content.trim().length > 0 || attachments.length > 0;
 
-  // If user is unauthenticated, lock input and display sign-in prompt
-  if (!session?.user) {
+  // While session is loading on initial frame, do not flash the sign-in prompt
+  if (status === "loading") {
+    return (
+      <div className="w-full max-w-3xl mx-auto px-4 pb-4">
+        <div className="rounded-3xl bg-zinc-100 dark:bg-[#2f2f2f] border border-zinc-200/80 dark:border-zinc-700/60 shadow-lg px-4 py-4 animate-pulse opacity-50">
+          <div className="h-5 w-44 bg-zinc-300 dark:bg-zinc-700 rounded-md" />
+        </div>
+        <div className="text-center text-[11.5px] text-zinc-500 dark:text-zinc-400 mt-2">
+          LangGPT can make mistakes. Check important info.
+        </div>
+      </div>
+    );
+  }
+
+  // If user is confirmed unauthenticated, lock input and display sign-in prompt
+  if (status === "unauthenticated") {
     return (
       <div className="w-full max-w-3xl mx-auto px-4 pb-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-100 dark:bg-[#282828] border border-zinc-200 dark:border-zinc-700/80 shadow-md text-center sm:text-left animate-in fade-in duration-200">

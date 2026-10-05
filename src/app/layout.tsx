@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { auth } from "@/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,11 +23,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await auth().catch(() => null);
+
   return (
     <html
       lang="en"
@@ -51,7 +54,7 @@ export default function RootLayout({
         />
       </head>
       <body className="h-full w-full overflow-hidden flex flex-col bg-white dark:bg-[#212121] text-zinc-900 dark:text-zinc-100">
-        <AuthProvider>
+        <AuthProvider session={session}>
           <ThemeProvider>{children}</ThemeProvider>
         </AuthProvider>
       </body>
