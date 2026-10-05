@@ -1,66 +1,45 @@
 /**
  * ==============================================================================
- * STEP 2: GLOBAL CONTEXT AWARENESS MANAGER
+ * STEP 2: GLOBAL CONTEXT AWARENESS MANAGER (DYNAMIC LOCAL DB BACKED)
  * ==============================================================================
- * Manages overarching, cross-cutting context that applies to every conversation turn.
+ * Dynamically loads user preferences, system directives, and learned chat context
+ * from the local database (`data/context_db.json`).
  * 
- * WHAT IS GLOBAL CONTEXT?
- * Unlike conversation-specific history (which is specific to a single chat thread),
- * Global Context provides the AI with:
- * 1. Persona & System Directives: Identity, tone, formatting standards.
- * 2. User Profile Awareness: User name, role, preferences, technical skill level.
- * 3. Environment & Temporal Awareness: Real-time date, active runtime environment.
- * 
- * HOW TO SCALE IN THE FUTURE:
- * - Load user preferences dynamically from a database (e.g., PostgreSQL, Supabase).
- * - Inject enterprise knowledge or RAG (Retrieval-Augmented Generation) document summaries.
+ * NO HARDCODED TEXT:
+ * All user preferences, persona instructions, custom guidelines, and learned rules
+ * are persisted in and queried from the local DB.
  */
 
-export interface UserContext {
-  userName?: string;
-  preferredLanguage?: string;
-  codingStylePreference?: string;
-  tone?: "concise" | "detailed" | "instructive";
-}
-
-export interface SystemDirectives {
-  assistantName: string;
-  role: string;
-  rules: string[];
-}
+import { localContextDb, UserPreferences } from "../db/localDb";
 
 export interface GlobalContextState {
-  system: SystemDirectives;
-  user: UserContext;
+  assistantName: string;
+  role: string;
+  baseRules: string[];
 }
 
-// In-memory global state default (can be updated or fetched from DB per request)
-const defaultGlobalState: GlobalContextState = {
-  system: {
-    assistantName: "ChatGPT",
-    role: "A world-class, helpful, highly analytical, and versatile AI assistant.",
-    rules: [
-      "Always provide clear, accurate, and structured answers.",
-      "Use GitHub-flavored markdown for all formatted content, lists, and tables.",
-      "When outputting code, always declare the language tag on fences (e.g., ```typescript, ```python).",
-      "Break complex explanations into logical, easy-to-read sections.",
-      "Be proactive in suggesting optimal design patterns, best practices, and error handling.",
-    ],
-  },
-  user: {
-    userName: "Kartik",
-    preferredLanguage: "TypeScript & Python",
-    codingStylePreference: "Clean, modular, fully typed with descriptive comments",
-    tone: "detailed",
-  },
+const defaultSystemDirectives: GlobalContextState = {
+  assistantName: "ChatGPT",
+  role: "A world-class, helpful, highly analytical, and versatile AI assistant.",
+  baseRules: [
+    "Always provide clear, accurate, and structured answers.",
+    "Use GitHub-flavored markdown for all formatted content, lists, and tables.",
+    "When outputting code, always declare the language tag on fences (e.g., ```typescript, ```python).",
+    "Break complex explanations into logical, easy-to-read sections.",
+  ],
 };
 
 /**
- * Returns formatted global context instructions ready to be injected into system prompts.
+ * Builds the complete dynamic system instruction from the local database.
  */
-export function buildGlobalContextInstruction(customUserContext?: Partial<UserContext>): string {
-  const user = { ...defaultGlobalState.user, ...customUserContext };
-  const system = defaultGlobalState.system;
+export async function buildGlobalContextInstructionAsync(
+  overridePreferences?: Partial<UserPreferences>
+): Promise<string> {
+  const dbPreferences = await localContextDb.getPreferences();
+  const preferences: UserPreferences = {
+    ...dbPreferences,
+    ...overridePreferences,
+  };
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -69,20 +48,58 @@ export function buildGlobalContextInstruction(customUserContext?: Partial<UserCo
     day: "numeric",
   });
 
-  return `
-[GLOBAL SYSTEM DIRECTIVES]
-You are ${system.assistantName}, ${system.role}
-Current Date: ${currentDate}
+  const sections: string[] = [];
 
-Rules & Guidelines:
-${system.rules.map((rule, idx) => `${idx + 1}. ${rule}`).join("\n")}
+  // 1. System Directives & Temporal Awareness
+  sections.push(
+    `[SYSTEM DIRECTIVES]\nYou are ${defaultSystemDirectives.assistantName}, ${defaultSystemDirectives.role}\nCurrent Date: ${currentDate}\n\nCore Guidelines:\n${defaultSystemDirectives.baseRules
+      .map((r, idx) => `${idx + 1}. ${r}`)
+      .join("\n")}`
+  );
 
-[GLOBAL USER CONTEXT]
-- Active User: ${user.userName || "User"}
-- Preferred Programming Language / Stack: ${user.preferredLanguage || "Standard"}
-- Code Style: ${user.codingStylePreference || "Standard clean code"}
-- Communication Style: ${user.tone || "informative and clear"}
+  // 2. User Preferences (Only included if configured)
+  const userDetails: string[] = [];
+  if (preferences.userName) {
+    userDetails.push(`- User's Name: ${preferences.userName}`);
+  }
+  if (preferences.role) {
+    userDetails.push(`- Role / Occupation: ${preferences.role}`);
+  }
+  if (preferences.preferredLanguages && preferences.preferredLanguages.length > 0) {
+    userDetails.push(`- Preferred Languages / Stack: ${preferences.preferredLanguages.join(", ")}`);
+  }
+  if (preferences.codingStyle) {
+    userDetails.push(`- Coding Style: ${preferences.codingStyle}`);
+  }
+  if (preferences.tone) {
+    userDetails.push(`- Preferred Response Tone: ${preferences.tone}`);
+  }
 
-Always tailor your explanations to align with the user's preferences without explicitly reciting this background unless requested.
-`.trim();
+  if (userDetails.length > 0) {
+    sections.push(`[USER PREFERENCES & CONTEXT]\n${userDetails.join("\n")}`);
+  }
+
+  // 3. User's Custom Instructions & Rules (from Settings)
+  if (preferences.customRules && preferences.customRules.length > 0) {
+    sections.push(
+      `[USER CUSTOM INSTRUCTIONS]\n${preferences.customRules
+        .map((rule, idx) => `${idx + 1}. ${rule}`)
+        .join("\n")}`
+    );
+  }
+
+  // 4. Automatically Learned Preferences (extracted from chat history)
+  if (preferences.learnedPreferences && preferences.learnedPreferences.length > 0) {
+    sections.push(
+      `[LEARNED CONTEXT & USER TRAITS]\n${preferences.learnedPreferences
+        .map((p, idx) => `• ${p}`)
+        .join("\n")}`
+    );
+  }
+
+  sections.push(
+    "Tailor your explanations, tone, and code examples to naturally adhere to the above user context without explicitly reciting these rules unless requested."
+  );
+
+  return sections.join("\n\n").trim();
 }

@@ -3,38 +3,35 @@
  * STEP 6: PROMPT BUILDER & CONTEXT INJECTOR
  * ==============================================================================
  * Assembles the full message array for LangChain by combining:
- * 1. Global Context Directives (System identity, rules, user profile)
+ * 1. Global Context Directives (Dynamically loaded from local database)
  * 2. Conversational Memory (Historical turns from memoryManager)
  * 3. Latest User Turn
- * 
- * WHY THIS IS CRUCIAL FOR GLOBAL AWARENESS:
- * - Ensures that every model invocation has full awareness of user preferences,
- *   active conversation history, and behavioral instructions.
  */
 
 import { BaseMessage, SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
-import { buildGlobalContextInstruction, UserContext } from "../context/globalContext";
+import { buildGlobalContextInstructionAsync } from "../context/globalContext";
+import { UserPreferences } from "../db/localDb";
 import { Message } from "@/types/chat";
 
 export interface PromptAssemblyOptions {
   historyMessages: BaseMessage[];
   currentTurnMessages: Message[];
-  customUserContext?: Partial<UserContext>;
+  customUserContext?: Partial<UserPreferences>;
 }
 
 export class PromptBuilder {
   /**
    * Builds the complete array of LangChain BaseMessages for the LLM.
    */
-  static buildPromptMessages({
+  static async buildPromptMessages({
     historyMessages,
     currentTurnMessages,
     customUserContext,
-  }: PromptAssemblyOptions): BaseMessage[] {
+  }: PromptAssemblyOptions): Promise<BaseMessage[]> {
     const finalMessages: BaseMessage[] = [];
 
-    // 1. Inject Global Context Awareness as the root SystemMessage
-    const globalInstruction = buildGlobalContextInstruction(customUserContext);
+    // 1. Inject Dynamic Global Context Awareness from Local Database
+    const globalInstruction = await buildGlobalContextInstructionAsync(customUserContext);
     finalMessages.push(new SystemMessage(globalInstruction));
 
     // 2. Inject Historical Memory Messages (if any)
@@ -43,8 +40,6 @@ export class PromptBuilder {
     }
 
     // 3. Inject Current Incoming Turn Messages
-    // Note: If history is already loaded from memory, currentTurnMessages usually contains
-    // the newest user query (and any client-side context).
     for (const msg of currentTurnMessages) {
       if (!msg || !msg.content) continue;
 

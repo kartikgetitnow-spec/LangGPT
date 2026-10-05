@@ -1,0 +1,16 @@
+{
+  "userName": "Kartik",
+  "role": "Senior Engineer",
+  "preferredLanguages": [
+    "Next.js",
+    "TypeScript"
+  ],
+  "codingStyle": "",
+  "tone": "informative and balanced",
+  "customRules": [],
+  "learnedPreferences": [
+    "always prefer using Tailwind v4 for all styling",
+    "Prefers Tailwind v4 for styling"
+  ],
+  "updatedAt": "2026-10-05T07:09:43.375Z"
+}
