@@ -13,14 +13,22 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [actualTheme, setActualTheme] = useState<"dark" | "light">("dark");
+export function ThemeProvider({
+  children,
+  initialTheme = "dark",
+}: {
+  children: React.ReactNode;
+  initialTheme?: Theme;
+}) {
+  const [theme, setThemeState] = useState<Theme>(initialTheme);
+  const [actualTheme, setActualTheme] = useState<"dark" | "light">(
+    initialTheme === "light" ? "light" : "dark"
+  );
 
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem("langgpt_theme") as Theme;
-      if (savedTheme) {
+      if (savedTheme && (savedTheme === "dark" || savedTheme === "light" || savedTheme === "system")) {
         setThemeState(savedTheme);
       }
     } catch {
@@ -43,12 +51,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     if (resolved === "dark") {
       root.classList.add("dark");
+      root.style.colorScheme = "dark";
     } else {
       root.classList.remove("dark");
+      root.style.colorScheme = "light";
     }
 
     try {
       localStorage.setItem("langgpt_theme", theme);
+      document.cookie = `langgpt_theme=${encodeURIComponent(theme)}; path=/; max-age=31536000; SameSite=Lax`;
     } catch {
       // ignore
     }

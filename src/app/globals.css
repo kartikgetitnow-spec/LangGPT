@@ -4,6 +4,18 @@
 
 @layer base {
   :root {
+    --bg-canvas: #212121;
+    --bg-sidebar: #171717;
+    --bg-surface: #2f2f2f;
+    --bg-input: #2f2f2f;
+    --bg-hover: #2f2f2f;
+    --border-subtle: #303030;
+    --text-primary: #ececec;
+    --text-secondary: #b4b4b4;
+    --text-muted: #737373;
+  }
+
+  html:not(.dark) {
     --bg-canvas: #ffffff;
     --bg-sidebar: #f9f9f9;
     --bg-surface: #f4f4f4;
@@ -25,6 +37,10 @@
     --text-primary: #ececec;
     --text-secondary: #b4b4b4;
     --text-muted: #737373;
+  }
+
+  html {
+    background-color: var(--bg-canvas);
   }
 
   body {
