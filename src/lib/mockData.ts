@@ -2,29 +2,30 @@ import { AIModel, Conversation, PromptSuggestion } from "@/types/chat";
 
 export const AVAILABLE_MODELS: AIModel[] = [
   {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    description: "Great for most tasks, smart and fast with vision and reasoning",
-    badge: "Omni",
+    id: "gemini-1.5-flash",
+    name: "Gemini 1.5 Flash",
+    description: "Fast, versatile, and multimodal with high-speed response times",
+    badge: "Flash",
   },
   {
-    id: "gpt-4o-mini",
-    name: "GPT-4o mini",
-    description: "Fastest and lightweight model for everyday tasks",
-    badge: "Fast",
-  },
-  {
-    id: "o1-preview",
-    name: "o1-preview",
-    description: "Advanced reasoning for complex math, science, and coding",
-    badge: "Reasoning",
+    id: "gemini-1.5-pro",
+    name: "Gemini 1.5 Pro",
+    description: "Best for complex reasoning, code architecture, math, and deep analysis",
+    badge: "Pro",
     isNew: true,
   },
   {
-    id: "o1-mini",
-    name: "o1-mini",
-    description: "Faster reasoning model especially adept at coding tasks",
-    badge: "Reasoning",
+    id: "gemini-2.0-flash",
+    name: "Gemini 2.0 Flash",
+    description: "Next-generation model optimized for ultra-low latency and tool calling",
+    badge: "Next-Gen",
+    isNew: true,
+  },
+  {
+    id: "gpt-4o",
+    name: "GPT-4o",
+    description: "OpenAI flagship omni-model for general tasks",
+    badge: "Omni",
   },
 ];
 
@@ -59,5 +60,5 @@ export const PROMPT_SUGGESTIONS: PromptSuggestion[] = [
   },
 ];
 
-// Clean empty initial conversations (no hardcoded chat history)
+// Clean empty initial conversations
 export const INITIAL_CONVERSATIONS: Conversation[] = [];
