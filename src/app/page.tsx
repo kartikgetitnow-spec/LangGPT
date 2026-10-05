@@ -91,6 +91,7 @@ export default function Home() {
         onStopGeneration={stopGeneration}
         onRegenerateLast={regenerateLastMessage}
         onNewChat={startNewChat}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       {/* Settings Modal */}

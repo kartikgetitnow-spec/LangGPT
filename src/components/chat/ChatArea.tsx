@@ -19,6 +19,7 @@ interface ChatAreaProps {
   onStopGeneration: () => void;
   onRegenerateLast: () => void;
   onNewChat: () => void;
+  onOpenAuth: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -32,6 +33,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onStopGeneration,
   onRegenerateLast,
   onNewChat,
+  onOpenAuth,
 }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<string | undefined>();
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
@@ -125,7 +127,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             onRegenerateLast={onRegenerateLast}
           />
         ) : (
-          <WelcomeScreen onSelectPrompt={handleSelectPrompt} />
+          <WelcomeScreen
+            onSelectPrompt={handleSelectPrompt}
+            onOpenAuth={onOpenAuth}
+          />
         )}
       </div>
 
@@ -136,6 +141,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         onStopGeneration={onStopGeneration}
         inputPrompt={selectedPrompt}
         onClearInputPrompt={() => setSelectedPrompt(undefined)}
+        onOpenAuth={onOpenAuth}
       />
     </main>
   );

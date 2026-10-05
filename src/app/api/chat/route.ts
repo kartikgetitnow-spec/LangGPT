@@ -47,13 +47,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Parse request payload and check auth session
-    const [body, session] = await Promise.all([
-      req.json(),
-      auth().catch(() => null),
-    ]);
+    // 2. Authentication & Authorization Guard: Reject unauthenticated users
+    const session = await auth().catch(() => null);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+          message: "You must be logged in to chat with LangGPT. Please sign in to continue.",
+        },
+        { status: 401 }
+      );
+    }
+
+    // 3. Parse request payload
+    const body = await req.json();
     const { conversationId, messages, model, userProfile } = body;
-    const userId = session?.user?.id;
+    const userId = session.user.id || session.user.email || undefined;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(

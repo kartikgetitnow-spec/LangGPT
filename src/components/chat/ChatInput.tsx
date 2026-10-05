@@ -10,7 +10,9 @@ import {
   Mic,
   X,
   FileText,
+  Lock,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { Attachment } from "@/types/chat";
 
 interface ChatInputProps {
@@ -19,6 +21,7 @@ interface ChatInputProps {
   onStopGeneration: () => void;
   inputPrompt?: string;
   onClearInputPrompt?: () => void;
+  onOpenAuth?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -27,7 +30,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onStopGeneration,
   inputPrompt,
   onClearInputPrompt,
+  onOpenAuth,
 }) => {
+  const { data: session } = useSession();
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isWebSearchActive, setIsWebSearchActive] = useState(false);
@@ -68,6 +73,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const handleSubmit = () => {
     if (isGenerating) {
       onStopGeneration();
+      return;
+    }
+
+    if (!session?.user) {
+      onOpenAuth?.();
       return;
     }
 
@@ -120,6 +130,38 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const canSubmit = content.trim().length > 0 || attachments.length > 0;
+
+  // If user is unauthenticated, lock input and display sign-in prompt
+  if (!session?.user) {
+    return (
+      <div className="w-full max-w-3xl mx-auto px-4 pb-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-100 dark:bg-[#282828] border border-zinc-200 dark:border-zinc-700/80 shadow-md text-center sm:text-left animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                Log in to start chatting with LangGPT
+              </div>
+              <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                Authentication required. Sign in or register to send messages and keep your context memory.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onOpenAuth}
+            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer"
+          >
+            Log in or Sign up
+          </button>
+        </div>
+        <div className="text-center text-[11.5px] text-zinc-500 dark:text-zinc-400 mt-2">
+          LangGPT can make mistakes. Check important info.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-3xl mx-auto px-4 pb-4">

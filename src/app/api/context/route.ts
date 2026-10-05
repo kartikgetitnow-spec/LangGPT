@@ -3,7 +3,7 @@
  * API ENDPOINT: /api/context
  * ==============================================================================
  * REST endpoints for managing the narrative user profile and context memory in PostgreSQL/localdb.
- * Scoped automatically to the authenticated user's session when logged in.
+ * Scoped strictly to authenticated users.
  * 
  * - GET: Retrieve the current living profile paragraph.
  * - POST: Save manual edits or updates to the profile paragraph.
@@ -16,8 +16,15 @@ import { auth } from "@/auth";
 
 export async function GET() {
   try {
-    const session = await auth();
-    const userId = session?.user?.id;
+    const session = await auth().catch(() => null);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please log in to view context profile." },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id || session.user.email || undefined;
     const profile = await localContextDb.getProfile(userId);
     return NextResponse.json(profile);
   } catch (error: unknown) {
@@ -28,8 +35,15 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id;
+    const session = await auth().catch(() => null);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please log in to update context profile." },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id || session.user.email || undefined;
     const body = await req.json();
     const profileText = typeof body.profileText === "string" ? body.profileText : "";
 
@@ -43,8 +57,15 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE() {
   try {
-    const session = await auth();
-    const userId = session?.user?.id;
+    const session = await auth().catch(() => null);
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please log in to reset context profile." },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id || session.user.email || undefined;
     const reset = await localContextDb.clearProfile(userId);
     return NextResponse.json(reset);
   } catch (error: unknown) {

@@ -1,11 +1,21 @@
 "use client";
 
+/**
+ * ==============================================================================
+ * WELCOME SCREEN
+ * ==============================================================================
+ * Displays greeting and starter prompt cards.
+ * If user is unauthenticated, prompts them to log in before starting.
+ */
+
 import React from "react";
+import { useSession } from "next-auth/react";
 import { PROMPT_SUGGESTIONS } from "@/lib/mockData";
 import { Sparkles, Code, Lightbulb, Activity, BookOpen, LucideIcon } from "lucide-react";
 
 interface WelcomeScreenProps {
   onSelectPrompt: (promptText: string) => void;
+  onOpenAuth?: () => void;
 }
 
 const iconMap: { [key: string]: LucideIcon } = {
@@ -15,10 +25,20 @@ const iconMap: { [key: string]: LucideIcon } = {
   BookOpen,
 };
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectPrompt }) => {
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectPrompt, onOpenAuth }) => {
+  const { data: session } = useSession();
+
+  const handleCardClick = (promptText: string) => {
+    if (!session?.user) {
+      onOpenAuth?.();
+      return;
+    }
+    onSelectPrompt(promptText);
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-3xl mx-auto w-full text-center">
-      {/* OpenAI Sparkle Icon */}
+      {/* LangGPT Icon */}
       <div className="mb-6 relative group">
         <div className="w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60 shadow-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
           <Sparkles className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
@@ -37,8 +57,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectPrompt }) 
           return (
             <button
               key={item.id}
-              onClick={() => onSelectPrompt(item.prompt)}
-              className="flex items-start gap-3 p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white/50 dark:bg-zinc-900/40 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/60 transition-all text-left group shadow-xs"
+              onClick={() => handleCardClick(item.prompt)}
+              className="flex items-start gap-3 p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white/50 dark:bg-zinc-900/40 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/60 transition-all text-left group shadow-xs cursor-pointer"
             >
               <div className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                 <IconComponent className="w-4 h-4" />

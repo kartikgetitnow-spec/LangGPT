@@ -51,6 +51,9 @@ export async function streamChatResponse({
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("You must be logged in to chat with LangGPT. Please log in or sign up to continue.");
+      }
       const errorText = await response.text().catch(() => "");
       throw new Error(
         `Backend request failed with status ${response.status}${
