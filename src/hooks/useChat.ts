@@ -2,31 +2,43 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Conversation, Message, Attachment } from "@/types/chat";
-import { INITIAL_CONVERSATIONS, AVAILABLE_MODELS } from "@/lib/mockData";
+import { AVAILABLE_MODELS } from "@/lib/mockData";
 import { streamChatResponse } from "@/services/chatService";
 
-const STORAGE_KEY = "langgpt_conversations";
-const CURRENT_CONV_KEY = "langgpt_active_id";
-const MODEL_KEY = "langgpt_selected_model";
+const STORAGE_KEY = "chatgpt_conversations";
+const CURRENT_CONV_KEY = "chatgpt_active_id";
+const MODEL_KEY = "chatgpt_selected_model";
 
 export function useChat() {
   const [conversations, setConversations] = useState<Conversation[]>(() => {
-    if (typeof window === "undefined") return INITIAL_CONVERSATIONS;
+    if (typeof window === "undefined") return [];
     try {
+      // Clear legacy storage keys that had mock data
+      localStorage.removeItem("langgpt_conversations");
+      localStorage.removeItem("langgpt_active_id");
+
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : INITIAL_CONVERSATIONS;
+      if (saved) {
+        const parsed: Conversation[] = JSON.parse(saved);
+        // Filter out legacy dummy conversation IDs if any
+        return parsed.filter((c) => c.id !== "conv-1" && c.id !== "conv-2");
+      }
+      return [];
     } catch {
-      return INITIAL_CONVERSATIONS;
+      return [];
     }
   });
 
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return "conv-1";
+    if (typeof window === "undefined") return null;
     try {
       const saved = localStorage.getItem(CURRENT_CONV_KEY);
-      return saved || (conversations[0]?.id ?? null);
+      if (saved && saved !== "conv-1" && saved !== "conv-2") {
+        return saved;
+      }
+      return null;
     } catch {
-      return conversations[0]?.id ?? null;
+      return null;
     }
   });
 
@@ -59,6 +71,12 @@ export function useChat() {
       } catch (e) {
         console.error("Failed to save active conversation id", e);
       }
+    } else {
+      try {
+        localStorage.removeItem(CURRENT_CONV_KEY);
+      } catch {
+        // ignore
+      }
     }
   }, [currentConversationId]);
 
@@ -75,7 +93,7 @@ export function useChat() {
   ) || null;
 
   /**
-   * Start a brand new chat
+   * Start a brand new empty chat
    */
   const startNewChat = useCallback(() => {
     if (isGenerating && abortControllerRef.current) {
@@ -143,7 +161,6 @@ export function useChat() {
     }
     setIsGenerating(false);
 
-    // Turn off isStreaming flag on active assistant message
     setConversations((prev) =>
       prev.map((conv) => {
         if (conv.id !== currentConversationId) return conv;
@@ -166,7 +183,7 @@ export function useChat() {
 
       let targetConvId = currentConversationId;
 
-      // If no active conversation exists or current is empty, ensure one exists
+      // If no active conversation exists, create a new one
       if (!targetConvId || !conversations.some((c) => c.id === targetConvId)) {
         targetConvId = `conv-${Date.now()}`;
         const newConv: Conversation = {
@@ -275,7 +292,7 @@ export function useChat() {
                           ...m,
                           content:
                             m.content ||
-                            "An error occurred while generating the response. Please check your backend connection.",
+                            `Error: ${err.message || "Unable to reach backend. Please ensure your backend server is running."}`,
                           isStreaming: false,
                         }
                       : m
@@ -301,7 +318,6 @@ export function useChat() {
     const msgs = activeConversation.messages;
     if (msgs.length === 0) return;
 
-    // Find the last user message
     let lastUserMsgIndex = -1;
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === "user") {
@@ -312,8 +328,6 @@ export function useChat() {
 
     if (lastUserMsgIndex === -1) return;
 
-    const lastUserMsg = msgs[lastUserMsgIndex];
-    // Trim messages to exclude old assistant response
     const trimmedMessages = msgs.slice(0, lastUserMsgIndex + 1);
 
     const assistantMsgId = `msg-${Date.now()}`;
@@ -371,6 +385,29 @@ export function useChat() {
                 ...conv,
                 messages: conv.messages.map((m) =>
                   m.id === assistantMsgId ? { ...m, isStreaming: false } : m
+                ),
+              };
+            })
+          );
+        },
+        onError: (err) => {
+          setIsGenerating(false);
+          abortControllerRef.current = null;
+          setConversations((prev) =>
+            prev.map((conv) => {
+              if (conv.id !== activeConversation.id) return conv;
+              return {
+                ...conv,
+                messages: conv.messages.map((m) =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content:
+                          m.content ||
+                          `Error: ${err.message || "Failed to regenerate response from backend."}`,
+                        isStreaming: false,
+                      }
+                    : m
                 ),
               };
             })
