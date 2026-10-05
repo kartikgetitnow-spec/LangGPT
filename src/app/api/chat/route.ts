@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Parse request payload
     const body = await req.json();
-    const { conversationId, messages, model, userContext } = body;
+    const { conversationId, messages, model, userProfile } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       conversationId: conversationId || "default-session",
       messages,
       model,
-      userContext,
+      userProfile,
     });
 
     // 4. Return the live stream to the client

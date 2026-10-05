@@ -6,25 +6,24 @@
  * 
  * Flow:
  * 1. Pulls past history turns for the `conversationId` from `memoryManager`.
- * 2. Dynamically loads User Preferences & System Directives from `localContextDb`.
+ * 2. Dynamically loads the User Profile Paragraph from `localContextDb`.
  * 3. Assembles prompt and streams tokens in real-time.
  * 4. Persists the turn into `memoryManager`.
- * 5. BACKGROUND LEARNING: Analyzes user input to extract and update user preferences
- *    in `localContextDb` automatically from every chat!
+ * 5. BACKGROUND LEARNING: Asks the LLM if any saveable details were shared,
+ *    and smoothly updates the user's narrative profile paragraph in `localContextDb`!
  */
 
 import { Message } from "@/types/chat";
 import { memoryManager } from "../memory/memoryManager";
 import { ModelFactory } from "../models/modelFactory";
 import { PromptBuilder } from "../prompts/promptTemplates";
-import { UserPreferences } from "../db/localDb";
-import { PreferenceExtractor } from "../context/preferenceExtractor";
+import { ProfileUpdater } from "../context/profileUpdater";
 
 export interface OrchestrationParams {
   conversationId?: string;
   messages: Message[];
   model?: string;
-  userContext?: Partial<UserPreferences>;
+  userProfile?: string;
   signal?: AbortSignal;
 }
 
@@ -60,7 +59,7 @@ export class ConversationOrchestrator {
     conversationId = "default-session",
     messages,
     model,
-    userContext,
+    userProfile,
   }: OrchestrationParams): Promise<ReadableStream<Uint8Array>> {
     // 1. Identify the latest user message
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
@@ -69,11 +68,11 @@ export class ConversationOrchestrator {
     // 2. Retrieve multi-turn history from memory store for this conversation
     const historyMessages = await memoryManager.getMessages(conversationId);
 
-    // 3. Assemble full prompt combining Dynamic Global Context + Memory + Current Turn
+    // 3. Assemble full prompt combining Dynamic Narrative Profile + Memory + Current Turn
     const promptMessages = await PromptBuilder.buildPromptMessages({
       historyMessages,
       currentTurnMessages: messages,
-      customUserContext: userContext,
+      customUserProfile: userProfile,
     });
 
     // 4. Initialize model from factory
@@ -107,9 +106,9 @@ export class ConversationOrchestrator {
               fullAssistantResponse
             );
 
-            // 8. BACKGROUND: Automatically extract and update user preferences in localdb
-            PreferenceExtractor.extractAndSave(userPrompt, fullAssistantResponse).catch((err) => {
-              console.warn("Background preference extraction error:", err);
+            // 8. BACKGROUND: Ask LLM if anything is saveable to update the user's profile paragraph in localdb
+            ProfileUpdater.evaluateAndUpdate(userPrompt, fullAssistantResponse).catch((err) => {
+              console.warn("Background profile updater error:", err);
             });
           }
 

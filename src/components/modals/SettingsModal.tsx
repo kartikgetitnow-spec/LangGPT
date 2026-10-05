@@ -13,8 +13,8 @@ import {
   Info,
   Check,
   Brain,
-  Plus,
   Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -23,16 +23,6 @@ interface SettingsModalProps {
   onClose: () => void;
   onClearAllChats?: () => void;
   conversationsData?: unknown;
-}
-
-interface ContextPreferences {
-  userName: string;
-  role: string;
-  preferredLanguages: string[];
-  codingStyle: string;
-  tone: string;
-  customRules: string[];
-  learnedPreferences: string[];
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -44,141 +34,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<"general" | "context" | "backend" | "data" | "about">("general");
 
-  // Context Awareness State
-  const [contextData, setContextData] = useState<ContextPreferences>({
-    userName: "",
-    role: "",
-    preferredLanguages: [],
-    codingStyle: "",
-    tone: "informative and balanced",
-    customRules: [],
-    learnedPreferences: [],
-  });
-  const [languagesInput, setLanguagesInput] = useState("");
-  const [newRuleInput, setNewRuleInput] = useState("");
-  const [isSavingContext, setIsSavingContext] = useState(false);
+  // Narrative Profile & Context State
+  const [profileText, setProfileText] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   // Backend URL state
   const [backendUrl, setBackendUrl] = useState("http://localhost:8000/api/chat");
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  // Fetch context from localdb on open
+  // Fetch narrative profile from localdb on open
   useEffect(() => {
     if (isOpen) {
       fetch("/api/context")
         .then((res) => res.json())
-        .then((data: ContextPreferences) => {
-          if (data) {
-            setContextData(data);
-            setLanguagesInput(data.preferredLanguages ? data.preferredLanguages.join(", ") : "");
+        .then((data) => {
+          if (data && typeof data.profileText === "string") {
+            setProfileText(data.profileText);
+            setUpdatedAt(data.updatedAt || null);
           }
         })
-        .catch((err) => console.error("Error loading context preferences:", err));
+        .catch((err) => console.error("Error loading profile context:", err));
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSavePreferences = async (e?: React.FormEvent) => {
+  const handleSaveProfile = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    setIsSavingContext(true);
+    setIsSavingProfile(true);
     try {
-      const languages = languagesInput
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      const payload = {
-        userName: contextData.userName,
-        role: contextData.role,
-        preferredLanguages: languages,
-        codingStyle: contextData.codingStyle,
-        tone: contextData.tone,
-      };
-
       const res = await fetch("/api/context", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ profileText }),
       });
 
       if (res.ok) {
-        const updated = await res.json();
-        setContextData(updated);
+        const data = await res.json();
+        setProfileText(data.profileText);
+        setUpdatedAt(data.updatedAt);
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 2000);
       }
     } catch (err) {
-      console.error("Failed to save context preferences:", err);
+      console.error("Failed to save profile:", err);
     } finally {
-      setIsSavingContext(false);
+      setIsSavingProfile(false);
     }
   };
 
-  const handleAddCustomRule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newRuleInput.trim()) return;
-
+  const handleClearProfile = async () => {
+    if (!confirm("Are you sure you want to clear your entire profile memory?")) return;
     try {
-      const res = await fetch("/api/context", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "add_rule",
-          rule: newRuleInput.trim(),
-        }),
-      });
-
+      const res = await fetch("/api/context", { method: "DELETE" });
       if (res.ok) {
-        const updated = await res.json();
-        setContextData(updated);
-        setNewRuleInput("");
+        const data = await res.json();
+        setProfileText(data.profileText || "");
+        setUpdatedAt(data.updatedAt);
       }
     } catch (err) {
-      console.error("Failed to add custom rule:", err);
-    }
-  };
-
-  const handleDeleteRule = async (index: number) => {
-    try {
-      const res = await fetch(`/api/context?action=delete_rule&index=${index}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setContextData(updated);
-      }
-    } catch (err) {
-      console.error("Failed to delete rule:", err);
-    }
-  };
-
-  const handleDeleteLearned = async (index: number) => {
-    try {
-      const res = await fetch(`/api/context?action=delete_learned&index=${index}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setContextData(updated);
-      }
-    } catch (err) {
-      console.error("Failed to delete learned trait:", err);
-    }
-  };
-
-  const handleClearAllContext = async () => {
-    if (!confirm("Are you sure you want to clear all stored user preferences and context memory?")) return;
-    try {
-      const res = await fetch("/api/context?action=clear_all", { method: "DELETE" });
-      if (res.ok) {
-        const reset = await res.json();
-        setContextData(reset);
-        setLanguagesInput("");
-      }
-    } catch (err) {
-      console.error("Failed to clear context memory:", err);
+      console.error("Failed to clear profile memory:", err);
     }
   };
 
@@ -203,7 +120,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+            className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -283,7 +200,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setTheme("dark")}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all ${
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                         theme === "dark"
                           ? "border-emerald-500 bg-emerald-500/10 text-emerald-500"
                           : "border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
@@ -294,7 +211,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                     <button
                       onClick={() => setTheme("light")}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all ${
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                         theme === "light"
                           ? "border-emerald-500 bg-emerald-500/10 text-emerald-500"
                           : "border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
@@ -305,7 +222,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                     <button
                       onClick={() => setTheme("system")}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all ${
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                         theme === "system"
                           ? "border-emerald-500 bg-emerald-500/10 text-emerald-500"
                           : "border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
@@ -319,224 +236,80 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
-            {/* Memory & Context Tab */}
+            {/* Narrative Paragraph Memory & Context Tab */}
             {activeTab === "context" && (
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <div>
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                       <Brain className="w-4 h-4 text-purple-400" />
-                      Context Awareness & Memory
+                      Memory & Narrative Profile
                     </h3>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-medium">
-                      Saved in Local DB
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-medium flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Auto-Updated by LLM
                     </span>
                   </div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    ChatGPT remembers your preferences, instructions, and learns relevant context across all chats.
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                    This is your living context paragraph. Whenever you share saveable preferences or background details during chat, the LLM automatically synthesizes and updates this paragraph in the local database.
                   </p>
                 </div>
 
-                {/* User Profile Form */}
-                <form onSubmit={handleSavePreferences} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        What should ChatGPT call you?
-                      </label>
-                      <input
-                        type="text"
-                        value={contextData.userName}
-                        onChange={(e) =>
-                          setContextData({ ...contextData, userName: e.target.value })
-                        }
-                        placeholder="e.g. Kartik"
-                        className="mt-1 w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 outline-none focus:border-purple-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        Your Role / Occupation
-                      </label>
-                      <input
-                        type="text"
-                        value={contextData.role}
-                        onChange={(e) =>
-                          setContextData({ ...contextData, role: e.target.value })
-                        }
-                        placeholder="e.g. Senior Frontend Engineer"
-                        className="mt-1 w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 outline-none focus:border-purple-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      Preferred Languages / Tech Stack (comma separated)
-                    </label>
-                    <input
-                      type="text"
-                      value={languagesInput}
-                      onChange={(e) => setLanguagesInput(e.target.value)}
-                      placeholder="e.g. Next.js, TypeScript, Tailwind, Python"
-                      className="mt-1 w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 outline-none focus:border-purple-400"
+                {/* Narrative Profile Paragraph Box */}
+                <form onSubmit={handleSaveProfile} className="space-y-3">
+                  <div className="relative">
+                    <textarea
+                      value={profileText}
+                      onChange={(e) => setProfileText(e.target.value)}
+                      placeholder="e.g. Kartik is a software engineer who specializes in Next.js and TypeScript. He prefers clean, modular code with descriptive comments and uses Tailwind CSS v4 for styling. He likes concise and direct answers without unnecessary boilerplate."
+                      rows={6}
+                      className="w-full p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 text-[13.5px] leading-relaxed text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 outline-none focus:border-purple-400 dark:focus:border-purple-400 transition-all resize-y shadow-xs"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        Preferred Coding Style
-                      </label>
-                      <input
-                        type="text"
-                        value={contextData.codingStyle}
-                        onChange={(e) =>
-                          setContextData({ ...contextData, codingStyle: e.target.value })
-                        }
-                        placeholder="e.g. Clean, modular, fully typed"
-                        className="mt-1 w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 outline-none focus:border-purple-400"
-                      />
+                  {updatedAt && (
+                    <div className="text-[11px] text-zinc-400 flex items-center justify-between px-1">
+                      <span>Last updated: {new Date(updatedAt).toLocaleString()}</span>
+                      <span>{profileText.length} characters</span>
                     </div>
-                    <div>
-                      <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                        Response Tone
-                      </label>
-                      <select
-                        value={contextData.tone}
-                        onChange={(e) =>
-                          setContextData({ ...contextData, tone: e.target.value })
-                        }
-                        className="mt-1 w-full px-3 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 outline-none focus:border-purple-400"
-                      >
-                        <option value="informative and balanced">Informative and balanced</option>
-                        <option value="concise and direct">Concise and direct</option>
-                        <option value="technical and detailed">Technical and detailed</option>
-                        <option value="instructive and step-by-step">Instructive and step-by-step</option>
-                      </select>
-                    </div>
-                  </div>
+                  )}
 
                   <div className="flex items-center justify-between pt-1">
                     <button
                       type="submit"
-                      disabled={isSavingContext}
+                      disabled={isSavingProfile}
                       className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       {savedSuccess ? (
                         <>
                           <Check className="w-4 h-4 text-white" />
-                          <span>Saved!</span>
+                          <span>Saved to Local DB!</span>
                         </>
                       ) : (
-                        <span>Save Preferences</span>
+                        <span>Save Paragraph</span>
                       )}
                     </button>
 
                     <button
                       type="button"
-                      onClick={handleClearAllContext}
-                      className="text-xs text-rose-500 hover:underline transition-colors cursor-pointer"
+                      onClick={handleClearProfile}
+                      className="text-xs text-rose-500 hover:underline flex items-center gap-1 transition-colors cursor-pointer"
                     >
-                      Reset All Context Memory
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Clear Profile Memory
                     </button>
                   </div>
                 </form>
 
-                {/* Custom Rules / Directives Section */}
-                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                        Custom Directives & Guidelines
-                      </h4>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                        Explicit instructions applied to every response.
-                      </p>
-                    </div>
+                {/* How it works info card */}
+                <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-700 dark:text-purple-300 leading-relaxed space-y-1.5">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    How Context Learning Works
                   </div>
-
-                  {/* Add rule input */}
-                  <form onSubmit={handleAddCustomRule} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newRuleInput}
-                      onChange={(e) => setNewRuleInput(e.target.value)}
-                      placeholder="e.g. Always write clean type-safe functions..."
-                      className="flex-1 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 outline-none"
-                    />
-                    <button
-                      type="submit"
-                      className="px-3 py-1.5 rounded-xl bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add
-                    </button>
-                  </form>
-
-                  {/* Custom Rules List */}
-                  {contextData.customRules && contextData.customRules.length > 0 ? (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                      {contextData.customRules.map((rule, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between gap-2 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-xs text-zinc-800 dark:text-zinc-200"
-                        >
-                          <span className="flex-1">{rule}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRule(idx)}
-                            className="text-zinc-400 hover:text-rose-500 p-1 transition-colors cursor-pointer"
-                            title="Delete directive"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-400 italic">No custom rules added yet.</div>
-                  )}
-                </div>
-
-                {/* Automatically Learned Preferences Section */}
-                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-emerald-400" />
-                    <div>
-                      <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                        Learned from Conversations
-                      </h4>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                        Preferences automatically detected from your messages. Delete any item you want ChatGPT to forget.
-                      </p>
-                    </div>
-                  </div>
-
-                  {contextData.learnedPreferences && contextData.learnedPreferences.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto">
-                      {contextData.learnedPreferences.map((trait, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-600 dark:text-purple-300"
-                        >
-                          <span>{trait}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteLearned(idx)}
-                            className="hover:text-rose-500 p-0.5 ml-1 transition-colors cursor-pointer"
-                            title="Forget this"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-400 italic">
-                      No learned traits yet. As you chat, explicit preferences you share will automatically appear here.
-                    </div>
-                  )}
+                  <p className="text-[11.5px] opacity-90">
+                    Whenever you mention personal details, working habits, preferred frameworks, or guidelines in any chat turn (e.g. <em>&quot;I code in Go&quot;</em>, <em>&quot;Call me Alex&quot;</em>, <em>&quot;Keep answers brief&quot;</em>), the backend asks Gemini to evaluate if the information is saveable and smoothly integrates it into this narrative paragraph.
+                  </p>
                 </div>
               </div>
             )}
@@ -580,12 +353,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                   </div>
                   <span className="text-[11px] text-zinc-400">
-                    Local database storage is active at <code className="font-mono">data/context_db.json</code>.
+                    Profile memory is persistently saved in <code className="font-mono">data/context_db.json</code>.
                   </span>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 leading-relaxed">
-                  ✓ LangChain Google Gemini streaming with dynamic Local DB context awareness is active!
+                  ✓ LangChain Google Gemini streaming with dynamic Local DB narrative profile memory is active!
                 </div>
               </div>
             )}
@@ -641,10 +414,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
                   Engineered with pixel-perfect attention to OpenAI ChatGPT&apos;s UI patterns, powered by
                   LangChain TypeScript, Google Gemini 2.5 streaming, multi-turn session memory, and
-                  Local DB dynamic context awareness.
+                  Local DB dynamic narrative context awareness.
                 </p>
                 <div className="text-xs text-zinc-400 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                  Version 1.2.0 • Local DB Context Awareness Active
+                  Version 1.3.0 • Narrative Profile Context Active
                 </div>
               </div>
             )}

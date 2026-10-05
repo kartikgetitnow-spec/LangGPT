@@ -3,20 +3,19 @@
  * STEP 6: PROMPT BUILDER & CONTEXT INJECTOR
  * ==============================================================================
  * Assembles the full message array for LangChain by combining:
- * 1. Global Context Directives (Dynamically loaded from local database)
+ * 1. Global Context Directives & Narrative User Profile (from localdb)
  * 2. Conversational Memory (Historical turns from memoryManager)
  * 3. Latest User Turn
  */
 
 import { BaseMessage, SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import { buildGlobalContextInstructionAsync } from "../context/globalContext";
-import { UserPreferences } from "../db/localDb";
 import { Message } from "@/types/chat";
 
 export interface PromptAssemblyOptions {
   historyMessages: BaseMessage[];
   currentTurnMessages: Message[];
-  customUserContext?: Partial<UserPreferences>;
+  customUserProfile?: string;
 }
 
 export class PromptBuilder {
@@ -26,12 +25,12 @@ export class PromptBuilder {
   static async buildPromptMessages({
     historyMessages,
     currentTurnMessages,
-    customUserContext,
+    customUserProfile,
   }: PromptAssemblyOptions): Promise<BaseMessage[]> {
     const finalMessages: BaseMessage[] = [];
 
-    // 1. Inject Dynamic Global Context Awareness from Local Database
-    const globalInstruction = await buildGlobalContextInstructionAsync(customUserContext);
+    // 1. Inject Global Context & Living Narrative User Profile from Local Database
+    const globalInstruction = await buildGlobalContextInstructionAsync(customUserProfile);
     finalMessages.push(new SystemMessage(globalInstruction));
 
     // 2. Inject Historical Memory Messages (if any)
@@ -44,7 +43,6 @@ export class PromptBuilder {
       if (!msg || !msg.content) continue;
 
       if (msg.role === "user") {
-        // Prevent duplicate appending if the message was already in memory
         const isDuplicate = historyMessages.some(
           (h) => h instanceof HumanMessage && h.content === msg.content
         );

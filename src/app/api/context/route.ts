@@ -2,11 +2,11 @@
  * ==============================================================================
  * API ENDPOINT: /api/context
  * ==============================================================================
- * REST endpoints for managing Global Context Awareness and User Preferences in localdb.
+ * REST endpoints for managing the narrative user profile and context memory in localdb.
  * 
- * - GET: Retrieve current user preferences, custom instructions, and learned context.
- * - POST: Update preferences or add a custom rule.
- * - DELETE: Delete a specific rule/learned preference or clear all context data.
+ * - GET: Retrieve the current living profile paragraph.
+ * - POST: Save manual edits or updates to the profile paragraph.
+ * - DELETE: Reset/clear the profile memory back to an empty slate.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,8 +14,8 @@ import { localContextDb } from "@/server/db/localDb";
 
 export async function GET() {
   try {
-    const preferences = await localContextDb.getPreferences();
-    return NextResponse.json(preferences);
+    const profile = await localContextDb.getProfile();
+    return NextResponse.json(profile);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -25,15 +25,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const profileText = typeof body.profileText === "string" ? body.profileText : "";
 
-    // Check if adding a single custom rule
-    if (body.action === "add_rule" && typeof body.rule === "string") {
-      const updated = await localContextDb.addCustomRule(body.rule);
-      return NextResponse.json(updated);
-    }
-
-    // Standard preferences update (name, role, codingStyle, tone, preferredLanguages)
-    const updated = await localContextDb.updatePreferences(body);
+    const updated = await localContextDb.updateProfile(profileText);
     return NextResponse.json(updated);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";
@@ -41,29 +35,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE() {
   try {
-    const { searchParams } = new URL(req.url);
-    const action = searchParams.get("action");
-    const indexStr = searchParams.get("index");
-    const index = indexStr !== null ? parseInt(indexStr, 10) : -1;
-
-    if (action === "clear_all") {
-      const reset = await localContextDb.clearAllContext();
-      return NextResponse.json(reset);
-    }
-
-    if (action === "delete_rule" && index >= 0) {
-      const updated = await localContextDb.deleteCustomRule(index);
-      return NextResponse.json(updated);
-    }
-
-    if (action === "delete_learned" && index >= 0) {
-      const updated = await localContextDb.deleteLearnedPreference(index);
-      return NextResponse.json(updated);
-    }
-
-    return NextResponse.json({ error: "Invalid action or index" }, { status: 400 });
+    const reset = await localContextDb.clearProfile();
+    return NextResponse.json(reset);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";
     return NextResponse.json({ error: msg }, { status: 500 });

@@ -1,40 +1,23 @@
 /**
  * ==============================================================================
- * LOCAL DATABASE FOR CONTEXT AWARENESS & MEMORY
+ * LOCAL DATABASE FOR USER PROFILE & CONTEXT MEMORY
  * ==============================================================================
- * A lightweight, file-based JSON database that stores user preferences, custom
- * instructions, and learned context across all conversations.
+ * Stores the user's ongoing profile as a natural, narrative paragraph
+ * (e.g. "Kartik is a software engineer who specializes in Next.js...").
  * 
- * WHY A LOCAL FILE-BASED DB?
- * - No external database infrastructure required (zero setup).
- * - Fully persistent: Survives app restarts and browser cache clears.
- * - Simple JSON structure: Easy to inspect, backup, edit, or migrate to PostgreSQL / MongoDB.
+ * Stored at: `data/context_db.json`
  */
 
 import fs from "fs/promises";
 import path from "path";
 
-export interface UserPreferences {
-  userName: string;
-  role: string;
-  preferredLanguages: string[];
-  codingStyle: string;
-  tone: string;
-  customRules: string[];
-  learnedPreferences: string[]; // Dynamically extracted from chat turns
+export interface UserProfileState {
+  profileText: string;
   updatedAt: string;
 }
 
-const DEFAULT_PREFERENCES: UserPreferences = {
-  userName: "",
-  role: "",
-  preferredLanguages: [],
-  codingStyle: "",
-  tone: "informative and balanced",
-  customRules: [],
-  learnedPreferences: [],
-  updatedAt: new Date().toISOString(),
-};
+const DEFAULT_PROFILE =
+  "Kartik is a software engineer who specializes in Next.js and TypeScript. He prefers clean, modular code and uses Tailwind CSS v4 for styling.";
 
 export class LocalContextDatabase {
   private dbPath: string;
@@ -57,10 +40,13 @@ export class LocalContextDatabase {
       try {
         await fs.access(this.dbPath);
       } catch {
-        // File does not exist, write default clean schema
+        const initialData: UserProfileState = {
+          profileText: DEFAULT_PROFILE,
+          updatedAt: new Date().toISOString(),
+        };
         await fs.writeFile(
           this.dbPath,
-          JSON.stringify(DEFAULT_PREFERENCES, null, 2),
+          JSON.stringify(initialData, null, 2),
           "utf-8"
         );
       }
@@ -71,116 +57,70 @@ export class LocalContextDatabase {
   }
 
   /**
-   * Reads and parses all context data from the local database.
+   * Reads the current user profile state from disk.
    */
-  async getPreferences(): Promise<UserPreferences> {
+  async getProfile(): Promise<UserProfileState> {
     await this.ensureInitialized();
     try {
       const content = await fs.readFile(this.dbPath, "utf-8");
-      return JSON.parse(content) as UserPreferences;
+      const parsed = JSON.parse(content);
+      // Support backward compatibility if previous schema was object
+      if (typeof parsed.profileText === "string") {
+        return parsed as UserProfileState;
+      }
+      // If previous format had userName or role
+      if (parsed.userName || parsed.role) {
+        const synthesized = `${parsed.userName || "User"} is a ${parsed.role || "developer"} who works with ${(parsed.preferredLanguages || []).join(", ") || "modern tech"}.`;
+        return {
+          profileText: synthesized,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return {
+        profileText: DEFAULT_PROFILE,
+        updatedAt: new Date().toISOString(),
+      };
     } catch (err) {
       console.error("Error reading context_db.json:", err);
-      return { ...DEFAULT_PREFERENCES };
+      return {
+        profileText: DEFAULT_PROFILE,
+        updatedAt: new Date().toISOString(),
+      };
     }
   }
 
   /**
-   * Persists the given preferences object to the file.
+   * Saves and updates the narrative profile paragraph.
    */
-  private async writePreferences(data: UserPreferences): Promise<void> {
+  async updateProfile(newText: string): Promise<UserProfileState> {
     await this.ensureInitialized();
-    const updated = {
-      ...data,
+    const updatedState: UserProfileState = {
+      profileText: newText.trim(),
       updatedAt: new Date().toISOString(),
     };
-    await fs.writeFile(this.dbPath, JSON.stringify(updated, null, 2), "utf-8");
-  }
-
-  /**
-   * Updates partial user preference fields.
-   */
-  async updatePreferences(partial: Partial<UserPreferences>): Promise<UserPreferences> {
-    const current = await this.getPreferences();
-    const merged: UserPreferences = {
-      ...current,
-      ...partial,
-      userName: partial.userName !== undefined ? partial.userName.trim() : current.userName,
-      role: partial.role !== undefined ? partial.role.trim() : current.role,
-      codingStyle: partial.codingStyle !== undefined ? partial.codingStyle.trim() : current.codingStyle,
-      tone: partial.tone !== undefined ? partial.tone.trim() : current.tone,
-      preferredLanguages: partial.preferredLanguages ?? current.preferredLanguages,
-      customRules: partial.customRules ?? current.customRules,
-      learnedPreferences: partial.learnedPreferences ?? current.learnedPreferences,
-    };
-
-    await this.writePreferences(merged);
-    return merged;
-  }
-
-  /**
-   * Appends an automatically learned preference if not already present.
-   */
-  async addLearnedPreference(preference: string): Promise<boolean> {
-    if (!preference || !preference.trim()) return false;
-    const clean = preference.trim();
-
-    const current = await this.getPreferences();
-    const exists = current.learnedPreferences.some(
-      (p) => p.toLowerCase() === clean.toLowerCase()
+    await fs.writeFile(
+      this.dbPath,
+      JSON.stringify(updatedState, null, 2),
+      "utf-8"
     );
-
-    if (exists) return false;
-
-    current.learnedPreferences.push(clean);
-    await this.writePreferences(current);
-    return true;
+    return updatedState;
   }
 
   /**
-   * Deletes a learned preference by index.
+   * Clears the profile back to an empty slate.
    */
-  async deleteLearnedPreference(index: number): Promise<UserPreferences> {
-    const current = await this.getPreferences();
-    if (index >= 0 && index < current.learnedPreferences.length) {
-      current.learnedPreferences.splice(index, 1);
-      await this.writePreferences(current);
-    }
-    return current;
-  }
-
-  /**
-   * Adds a user-defined custom instruction / rule.
-   */
-  async addCustomRule(rule: string): Promise<UserPreferences> {
-    if (!rule || !rule.trim()) return this.getPreferences();
-    const current = await this.getPreferences();
-    current.customRules.push(rule.trim());
-    await this.writePreferences(current);
-    return current;
-  }
-
-  /**
-   * Deletes a user-defined custom instruction / rule by index.
-   */
-  async deleteCustomRule(index: number): Promise<UserPreferences> {
-    const current = await this.getPreferences();
-    if (index >= 0 && index < current.customRules.length) {
-      current.customRules.splice(index, 1);
-      await this.writePreferences(current);
-    }
-    return current;
-  }
-
-  /**
-   * Resets all stored context data back to pristine defaults.
-   */
-  async clearAllContext(): Promise<UserPreferences> {
-    const reset = {
-      ...DEFAULT_PREFERENCES,
+  async clearProfile(): Promise<UserProfileState> {
+    await this.ensureInitialized();
+    const emptyState: UserProfileState = {
+      profileText: "",
       updatedAt: new Date().toISOString(),
     };
-    await this.writePreferences(reset);
-    return reset;
+    await fs.writeFile(
+      this.dbPath,
+      JSON.stringify(emptyState, null, 2),
+      "utf-8"
+    );
+    return emptyState;
   }
 }
 
