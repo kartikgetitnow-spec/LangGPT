@@ -10,61 +10,55 @@ const CURRENT_CONV_KEY = "chatgpt_active_id";
 const MODEL_KEY = "chatgpt_selected_model";
 
 export function useChat() {
-  const [conversations, setConversations] = useState<Conversation[]>(() => {
-    if (typeof window === "undefined") return [];
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Safely load from localStorage on client mount (prevents SSR hydration mismatch)
+  useEffect(() => {
+    setIsMounted(true);
     try {
-      // Clear legacy storage keys that had mock data
+      // Clear legacy storage keys with mock data
       localStorage.removeItem("langgpt_conversations");
       localStorage.removeItem("langgpt_active_id");
 
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed: Conversation[] = JSON.parse(saved);
-        // Filter out legacy dummy conversation IDs if any
-        return parsed.filter((c) => c.id !== "conv-1" && c.id !== "conv-2");
+      const savedConvs = localStorage.getItem(STORAGE_KEY);
+      if (savedConvs) {
+        const parsed: Conversation[] = JSON.parse(savedConvs);
+        const filtered = parsed.filter((c) => c.id !== "conv-1" && c.id !== "conv-2");
+        setConversations(filtered);
       }
-      return [];
-    } catch {
-      return [];
-    }
-  });
 
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const saved = localStorage.getItem(CURRENT_CONV_KEY);
-      if (saved && saved !== "conv-1" && saved !== "conv-2") {
-        return saved;
+      const savedId = localStorage.getItem(CURRENT_CONV_KEY);
+      if (savedId && savedId !== "conv-1" && savedId !== "conv-2") {
+        setCurrentConversationId(savedId);
       }
-      return null;
-    } catch {
-      return null;
+
+      const savedModel = localStorage.getItem(MODEL_KEY);
+      if (savedModel) {
+        setSelectedModel(savedModel);
+      }
+    } catch (e) {
+      console.error("Error reading from localStorage:", e);
     }
-  });
+  }, []);
 
-  const [selectedModel, setSelectedModel] = useState<string>(() => {
-    if (typeof window === "undefined") return AVAILABLE_MODELS[0].id;
-    try {
-      const saved = localStorage.getItem(MODEL_KEY);
-      return saved || AVAILABLE_MODELS[0].id;
-    } catch {
-      return AVAILABLE_MODELS[0].id;
-    }
-  });
-
-  const [isGenerating, setIsGenerating] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Sync to local storage
+  // Sync conversations to localStorage
   useEffect(() => {
+    if (!isMounted) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
     } catch (e) {
       console.error("Failed to save conversations to localStorage", e);
     }
-  }, [conversations]);
+  }, [conversations, isMounted]);
 
+  // Sync active conversation ID
   useEffect(() => {
+    if (!isMounted) return;
     if (currentConversationId) {
       try {
         localStorage.setItem(CURRENT_CONV_KEY, currentConversationId);
@@ -78,15 +72,17 @@ export function useChat() {
         // ignore
       }
     }
-  }, [currentConversationId]);
+  }, [currentConversationId, isMounted]);
 
+  // Sync selected model
   useEffect(() => {
+    if (!isMounted) return;
     try {
       localStorage.setItem(MODEL_KEY, selectedModel);
     } catch (e) {
       console.error("Failed to save selected model", e);
     }
-  }, [selectedModel]);
+  }, [selectedModel, isMounted]);
 
   const activeConversation = conversations.find(
     (c) => c.id === currentConversationId
@@ -425,6 +421,7 @@ export function useChat() {
     activeConversation,
     selectedModel,
     isGenerating,
+    isMounted,
     setCurrentConversationId,
     setSelectedModel,
     startNewChat,

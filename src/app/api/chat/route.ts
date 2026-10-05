@@ -60,14 +60,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Map requested model to supported Gemini models
-    let geminiModel = "gemini-1.5-flash";
+    let geminiModel = "gemini-2.5-flash";
     if (model) {
       if (model.includes("pro")) {
-        geminiModel = "gemini-1.5-pro";
-      } else if (model.includes("2.0")) {
-        geminiModel = "gemini-2.0-flash";
-      } else if (model.includes("gemini")) {
+        geminiModel = "gemini-2.5-pro";
+      } else if (model.includes("2.5") || model.includes("latest")) {
         geminiModel = model;
+      } else if (model.includes("flash")) {
+        geminiModel = "gemini-2.5-flash";
       }
     }
 

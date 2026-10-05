@@ -2,30 +2,29 @@ import { AIModel, Conversation, PromptSuggestion } from "@/types/chat";
 
 export const AVAILABLE_MODELS: AIModel[] = [
   {
-    id: "gemini-1.5-flash",
-    name: "Gemini 1.5 Flash",
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
     description: "Fast, versatile, and multimodal with high-speed response times",
     badge: "Flash",
   },
   {
-    id: "gemini-1.5-pro",
-    name: "Gemini 1.5 Pro",
+    id: "gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
     description: "Best for complex reasoning, code architecture, math, and deep analysis",
     badge: "Pro",
     isNew: true,
   },
   {
-    id: "gemini-2.0-flash",
-    name: "Gemini 2.0 Flash",
-    description: "Next-generation model optimized for ultra-low latency and tool calling",
-    badge: "Next-Gen",
-    isNew: true,
+    id: "gemini-flash-latest",
+    name: "Gemini Flash Latest",
+    description: "Always points to the latest production-ready Flash release",
+    badge: "Latest",
   },
   {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    description: "OpenAI flagship omni-model for general tasks",
-    badge: "Omni",
+    id: "gemini-pro-latest",
+    name: "Gemini Pro Latest",
+    description: "Always points to the latest production-ready Pro release",
+    badge: "Pro",
   },
 ];
 
