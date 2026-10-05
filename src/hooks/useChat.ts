@@ -18,61 +18,60 @@ const STORAGE_KEY = "langgpt_conversations";
 const CURRENT_CONV_KEY = "langgpt_active_id";
 const MODEL_KEY = "langgpt_selected_model";
 
-// Synchronous initializers to eliminate 1-second "New Chat" flash on refresh
-function getInitialConversations(): Conversation[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("chatgpt_conversations");
-    if (saved) {
-      const parsed: Conversation[] = JSON.parse(saved);
-      return parsed.filter((c) => c.id !== "conv-1" && c.id !== "conv-2");
-    }
-  } catch {
-    // ignore
-  }
-  return [];
+export interface UseChatOptions {
+  initialConversations?: Conversation[];
+  initialActiveId?: string | null;
 }
 
-function getInitialActiveId(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const saved = localStorage.getItem(CURRENT_CONV_KEY) || localStorage.getItem("chatgpt_active_id");
-    if (saved && saved !== "conv-1" && saved !== "conv-2") {
-      return saved;
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-function getInitialModel(): string {
-  if (typeof window === "undefined") return AVAILABLE_MODELS[0].id;
-  try {
-    const saved = localStorage.getItem(MODEL_KEY) || localStorage.getItem("chatgpt_selected_model");
-    if (saved) return saved;
-  } catch {
-    // ignore
-  }
-  return AVAILABLE_MODELS[0].id;
-}
-
-export function useChat() {
+export function useChat({
+  initialConversations = [],
+  initialActiveId = null,
+}: UseChatOptions = {}) {
   const { status } = useSession();
-  
-  // Instantaneous synchronous state initialization from persistent storage
-  const [conversations, setConversations] = useState<Conversation[]>(getInitialConversations);
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(getInitialActiveId);
-  const [selectedModel, setSelectedModel] = useState<string>(getInitialModel);
+
+  // Instantaneous synchronous state initialization from server props (guarantees 100% SSR match)
+  const [conversations, setConversations] = useState<Conversation[]>(() => initialConversations);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(() => {
+    if (initialActiveId) return initialActiveId;
+    if (initialConversations.length > 0) return initialConversations[0].id;
+    return null;
+  });
+  const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Mark client mounted
+  // Mark client mounted and load client-only preferences safely after hydration
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+
+    try {
+      const savedModel = localStorage.getItem(MODEL_KEY);
+      if (savedModel && AVAILABLE_MODELS.some((m) => m.id === savedModel)) {
+        setSelectedModel(savedModel);
+      }
+    } catch {}
+
+    // Fallback: if server provided 0 conversations (e.g. offline/guest), check client localStorage
+    if (initialConversations.length === 0) {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed: Conversation[] = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setConversations(parsed);
+            const savedId = localStorage.getItem(CURRENT_CONV_KEY);
+            if (savedId && parsed.some((c: Conversation) => c.id === savedId)) {
+              setCurrentConversationId(savedId);
+            } else {
+              setCurrentConversationId(parsed[0].id);
+            }
+          }
+        }
+      } catch {}
+    }
+  }, [initialConversations.length]);
 
   // Background fetch from server (accelerated by Redis) when authenticated
   useEffect(() => {
@@ -85,12 +84,11 @@ export function useChat() {
 
             // Maintain the active chat session without jumping back to New Chat
             setCurrentConversationId((prev) => {
-              const savedId = typeof window !== "undefined"
-                ? (localStorage.getItem(CURRENT_CONV_KEY) || localStorage.getItem("chatgpt_active_id"))
-                : null;
-              const target = prev || savedId;
-              if (target && serverConvs.some((c) => c.id === target)) {
-                return target;
+              if (prev && serverConvs.some((c) => c.id === prev)) {
+                return prev;
+              }
+              if (prev === null) {
+                return null;
               }
               return serverConvs[0].id;
             });
@@ -110,21 +108,21 @@ export function useChat() {
     }
   }, [conversations, isMounted]);
 
-  // Persist active conversation ID to localStorage
+  // Persist active conversation ID to cookie and localStorage
   useEffect(() => {
     if (!isMounted) return;
     if (currentConversationId) {
+      document.cookie = `langgpt_active_id=${encodeURIComponent(currentConversationId)}; path=/; max-age=31536000; SameSite=Lax`;
       try {
         localStorage.setItem(CURRENT_CONV_KEY, currentConversationId);
       } catch (e) {
         console.error("Failed to save active conversation id", e);
       }
     } else {
+      document.cookie = `langgpt_active_id=new; path=/; max-age=31536000; SameSite=Lax`;
       try {
-        localStorage.removeItem(CURRENT_CONV_KEY);
-      } catch {
-        // ignore
-      }
+        localStorage.setItem(CURRENT_CONV_KEY, "new");
+      } catch {}
     }
   }, [currentConversationId, isMounted]);
 

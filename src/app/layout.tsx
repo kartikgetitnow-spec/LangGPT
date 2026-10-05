@@ -5,6 +5,8 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { auth } from "@/auth";
 
+import Script from "next/script";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -36,24 +38,20 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var theme = localStorage.getItem('langgpt_theme') || 'dark';
-                var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                if (isDark) {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
-              } catch (e) {}
-            `,
-          }}
-        />
-      </head>
       <body className="h-full w-full overflow-hidden flex flex-col bg-white dark:bg-[#212121] text-zinc-900 dark:text-zinc-100">
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`
+            try {
+              var theme = localStorage.getItem('langgpt_theme') || 'dark';
+              var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+              if (isDark) {
+                document.documentElement.classList.add('dark');
+              } else {
+                document.documentElement.classList.remove('dark');
+              }
+            } catch (e) {}
+          `}
+        </Script>
         <AuthProvider session={session}>
           <ThemeProvider>{children}</ThemeProvider>
         </AuthProvider>
