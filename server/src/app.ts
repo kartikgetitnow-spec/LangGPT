@@ -1,9 +1,12 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
 import dotenv from "dotenv";
 
-// Load environment variables (.env.local, .env)
+// Load server-specific environment variables (server/.env)
+dotenv.config({ path: path.resolve(process.cwd(), "server/.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
