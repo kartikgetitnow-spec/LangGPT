@@ -2,7 +2,8 @@
  * ==============================================================================
  * API ENDPOINT: /api/context
  * ==============================================================================
- * REST endpoints for managing the narrative user profile and context memory in localdb.
+ * REST endpoints for managing the narrative user profile and context memory in PostgreSQL/localdb.
+ * Scoped automatically to the authenticated user's session when logged in.
  * 
  * - GET: Retrieve the current living profile paragraph.
  * - POST: Save manual edits or updates to the profile paragraph.
@@ -11,10 +12,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { localContextDb } from "@/server/db/localDb";
+import { auth } from "@/auth";
 
 export async function GET() {
   try {
-    const profile = await localContextDb.getProfile();
+    const session = await auth();
+    const userId = session?.user?.id;
+    const profile = await localContextDb.getProfile(userId);
     return NextResponse.json(profile);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";
@@ -24,10 +28,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    const userId = session?.user?.id;
     const body = await req.json();
     const profileText = typeof body.profileText === "string" ? body.profileText : "";
 
-    const updated = await localContextDb.updateProfile(profileText);
+    const updated = await localContextDb.updateProfile(profileText, userId);
     return NextResponse.json(updated);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";
@@ -37,7 +43,9 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE() {
   try {
-    const reset = await localContextDb.clearProfile();
+    const session = await auth();
+    const userId = session?.user?.id;
+    const reset = await localContextDb.clearProfile(userId);
     return NextResponse.json(reset);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";

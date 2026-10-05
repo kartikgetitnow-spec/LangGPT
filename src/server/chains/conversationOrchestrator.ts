@@ -6,11 +6,11 @@
  * 
  * Flow:
  * 1. Pulls past history turns for the `conversationId` from `memoryManager`.
- * 2. Dynamically loads the User Profile Paragraph from `localContextDb`.
+ * 2. Dynamically loads the User Profile Paragraph from PostgreSQL/localdb (scoped to user).
  * 3. Assembles prompt and streams tokens in real-time.
  * 4. Persists the turn into `memoryManager`.
  * 5. BACKGROUND LEARNING: Asks the LLM if any saveable details were shared,
- *    and smoothly updates the user's narrative profile paragraph in `localContextDb`!
+ *    and smoothly updates the user's narrative profile paragraph in PostgreSQL/localdb!
  */
 
 import { Message } from "@/types/chat";
@@ -24,6 +24,7 @@ export interface OrchestrationParams {
   messages: Message[];
   model?: string;
   userProfile?: string;
+  userId?: string;
   signal?: AbortSignal;
 }
 
@@ -60,6 +61,7 @@ export class ConversationOrchestrator {
     messages,
     model,
     userProfile,
+    userId,
   }: OrchestrationParams): Promise<ReadableStream<Uint8Array>> {
     // 1. Identify the latest user message
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
@@ -73,6 +75,7 @@ export class ConversationOrchestrator {
       historyMessages,
       currentTurnMessages: messages,
       customUserProfile: userProfile,
+      userId,
     });
 
     // 4. Initialize model from factory
@@ -106,8 +109,8 @@ export class ConversationOrchestrator {
               fullAssistantResponse
             );
 
-            // 8. BACKGROUND: Ask LLM if anything is saveable to update the user's profile paragraph in localdb
-            ProfileUpdater.evaluateAndUpdate(userPrompt, fullAssistantResponse).catch((err) => {
+            // 8. BACKGROUND: Ask LLM if anything is saveable to update the user's profile paragraph
+            ProfileUpdater.evaluateAndUpdate(userPrompt, fullAssistantResponse, userId).catch((err) => {
               console.warn("Background profile updater error:", err);
             });
           }

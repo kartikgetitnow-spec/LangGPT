@@ -5,6 +5,7 @@ import { useChat } from "@/hooks/useChat";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { SettingsModal } from "@/components/modals/SettingsModal";
+import { AuthModal } from "@/components/modals/AuthModal";
 
 export default function Home() {
   const {
@@ -26,6 +27,7 @@ export default function Home() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Responsive sidebar initial state on screen resize
   useEffect(() => {
@@ -74,6 +76,7 @@ export default function Home() {
         onRenameChat={renameConversation}
         onTogglePin={togglePinConversation}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       {/* Main Chat Interface */}
@@ -96,6 +99,12 @@ export default function Home() {
         onClose={() => setIsSettingsOpen(false)}
         onClearAllChats={handleClearAllChats}
         conversationsData={conversations}
+      />
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
       />
     </div>
   );

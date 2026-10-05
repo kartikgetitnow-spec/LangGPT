@@ -1,15 +1,17 @@
 /**
  * ==============================================================================
- * LOCAL DATABASE FOR USER PROFILE & CONTEXT MEMORY
+ * DATABASE FOR USER PROFILE & CONTEXT MEMORY (PostgreSQL + Local File Fallback)
  * ==============================================================================
  * Stores the user's ongoing profile as a natural, narrative paragraph
  * (e.g. "Kartik is a software engineer who specializes in Next.js...").
  * 
- * Stored at: `data/context_db.json`
+ * Persists to PostgreSQL via Prisma `ProfileContext` model for signed-in users,
+ * with a resilient local JSON file fallback (`data/context_db.json`).
  */
 
 import fs from "fs/promises";
 import path from "path";
+import { prisma } from "./prisma";
 
 export interface UserProfileState {
   profileText: string;
@@ -28,7 +30,7 @@ export class LocalContextDatabase {
   }
 
   /**
-   * Ensures the data directory and context_db.json file exist.
+   * Ensures the fallback data directory and context_db.json file exist.
    */
   private async ensureInitialized(): Promise<void> {
     if (this.isInitialized) return;
@@ -57,31 +59,38 @@ export class LocalContextDatabase {
   }
 
   /**
-   * Reads the current user profile state from disk.
+   * Reads user profile state. First checks Prisma PostgreSQL if userId is provided,
+   * otherwise reads from the local file fallback.
    */
-  async getProfile(): Promise<UserProfileState> {
+  async getProfile(userId?: string): Promise<UserProfileState> {
+    if (userId) {
+      try {
+        const dbContext = await prisma.profileContext.findUnique({
+          where: { userId },
+        });
+        if (dbContext) {
+          return {
+            profileText: dbContext.profileText,
+            updatedAt: dbContext.updatedAt.toISOString(),
+          };
+        }
+      } catch (err) {
+        console.warn("PostgreSQL profile lookup failed; using local fallback:", (err as Error).message);
+      }
+    }
+
     await this.ensureInitialized();
     try {
       const content = await fs.readFile(this.dbPath, "utf-8");
       const parsed = JSON.parse(content);
-      // Support backward compatibility if previous schema was object
       if (typeof parsed.profileText === "string") {
         return parsed as UserProfileState;
-      }
-      // If previous format had userName or role
-      if (parsed.userName || parsed.role) {
-        const synthesized = `${parsed.userName || "User"} is a ${parsed.role || "developer"} who works with ${(parsed.preferredLanguages || []).join(", ") || "modern tech"}.`;
-        return {
-          profileText: synthesized,
-          updatedAt: new Date().toISOString(),
-        };
       }
       return {
         profileText: DEFAULT_PROFILE,
         updatedAt: new Date().toISOString(),
       };
-    } catch (err) {
-      console.error("Error reading context_db.json:", err);
+    } catch {
       return {
         profileText: DEFAULT_PROFILE,
         updatedAt: new Date().toISOString(),
@@ -90,36 +99,71 @@ export class LocalContextDatabase {
   }
 
   /**
-   * Saves and updates the narrative profile paragraph.
+   * Saves and updates the narrative profile paragraph in PostgreSQL & fallback.
    */
-  async updateProfile(newText: string): Promise<UserProfileState> {
+  async updateProfile(newText: string, userId?: string): Promise<UserProfileState> {
+    const trimmed = newText.trim();
+    const now = new Date().toISOString();
+
+    if (userId) {
+      try {
+        await prisma.profileContext.upsert({
+          where: { userId },
+          update: { profileText: trimmed },
+          create: { userId, profileText: trimmed },
+        });
+      } catch (err) {
+        console.warn("PostgreSQL profile update failed; falling back to local file:", (err as Error).message);
+      }
+    }
+
     await this.ensureInitialized();
     const updatedState: UserProfileState = {
-      profileText: newText.trim(),
-      updatedAt: new Date().toISOString(),
+      profileText: trimmed,
+      updatedAt: now,
     };
-    await fs.writeFile(
-      this.dbPath,
-      JSON.stringify(updatedState, null, 2),
-      "utf-8"
-    );
+    try {
+      await fs.writeFile(
+        this.dbPath,
+        JSON.stringify(updatedState, null, 2),
+        "utf-8"
+      );
+    } catch (writeErr) {
+      console.error("Failed to write to context_db.json:", writeErr);
+    }
     return updatedState;
   }
 
   /**
    * Clears the profile back to an empty slate.
    */
-  async clearProfile(): Promise<UserProfileState> {
+  async clearProfile(userId?: string): Promise<UserProfileState> {
+    const now = new Date().toISOString();
+
+    if (userId) {
+      try {
+        await prisma.profileContext.deleteMany({
+          where: { userId },
+        });
+      } catch {
+        // ignore
+      }
+    }
+
     await this.ensureInitialized();
     const emptyState: UserProfileState = {
       profileText: "",
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     };
-    await fs.writeFile(
-      this.dbPath,
-      JSON.stringify(emptyState, null, 2),
-      "utf-8"
-    );
+    try {
+      await fs.writeFile(
+        this.dbPath,
+        JSON.stringify(emptyState, null, 2),
+        "utf-8"
+      );
+    } catch {
+      // ignore
+    }
     return emptyState;
   }
 }

@@ -3,7 +3,7 @@
  * STEP 6: PROMPT BUILDER & CONTEXT INJECTOR
  * ==============================================================================
  * Assembles the full message array for LangChain by combining:
- * 1. Global Context Directives & Narrative User Profile (from localdb)
+ * 1. Global Context Directives & Narrative User Profile (from PostgreSQL/localdb)
  * 2. Conversational Memory (Historical turns from memoryManager)
  * 3. Latest User Turn
  */
@@ -16,6 +16,7 @@ export interface PromptAssemblyOptions {
   historyMessages: BaseMessage[];
   currentTurnMessages: Message[];
   customUserProfile?: string;
+  userId?: string;
 }
 
 export class PromptBuilder {
@@ -26,11 +27,12 @@ export class PromptBuilder {
     historyMessages,
     currentTurnMessages,
     customUserProfile,
+    userId,
   }: PromptAssemblyOptions): Promise<BaseMessage[]> {
     const finalMessages: BaseMessage[] = [];
 
-    // 1. Inject Global Context & Living Narrative User Profile from Local Database
-    const globalInstruction = await buildGlobalContextInstructionAsync(customUserProfile);
+    // 1. Inject Global Context & Living Narrative User Profile (scoped by userId)
+    const globalInstruction = await buildGlobalContextInstructionAsync(customUserProfile, userId);
     finalMessages.push(new SystemMessage(globalInstruction));
 
     // 2. Inject Historical Memory Messages (if any)

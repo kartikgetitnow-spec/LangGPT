@@ -2,8 +2,8 @@
  * ==============================================================================
  * STEP 2: GLOBAL CONTEXT AWARENESS (PARAGRAPH-BASED PROFILE)
  * ==============================================================================
- * Injects the living narrative user profile from `localContextDb` into the system
- * prompt for full global awareness.
+ * Injects the living narrative user profile from PostgreSQL / localContextDb into the system
+ * prompt for full global awareness, scoped per user.
  */
 
 import { localContextDb } from "../db/localDb";
@@ -12,9 +12,10 @@ import { localContextDb } from "../db/localDb";
  * Builds the complete dynamic system prompt instruction.
  */
 export async function buildGlobalContextInstructionAsync(
-  overrideProfile?: string
+  overrideProfile?: string,
+  userId?: string
 ): Promise<string> {
-  const profileState = await localContextDb.getProfile();
+  const profileState = await localContextDb.getProfile(userId);
   const profile = overrideProfile !== undefined ? overrideProfile : profileState.profileText;
 
   const currentDate = new Date().toLocaleDateString("en-US", {

@@ -24,6 +24,7 @@ interface SidebarProps {
   onRenameChat: (id: string, newTitle: string) => void;
   onTogglePin?: (id: string) => void;
   onOpenSettings: () => void;
+  onOpenAuth: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -37,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRenameChat,
   onTogglePin,
   onOpenSettings,
+  onOpenAuth,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -156,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
 
         {/* Bottom User Profile */}
-        <UserProfile onOpenSettings={onOpenSettings} />
+        <UserProfile onOpenSettings={onOpenSettings} onOpenAuth={onOpenAuth} />
       </aside>
     </>
   );

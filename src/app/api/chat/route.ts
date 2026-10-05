@@ -6,14 +6,16 @@
  * 
  * RESPONSIBILITIES:
  * 1. Request Parsing & Validation: Parses `conversationId`, `messages`, and `model`.
- * 2. API Key Guard: Returns instructive markdown if `GOOGLE_API_KEY` is missing.
- * 3. Delegation: Hands off execution to `ConversationOrchestrator`.
- * 4. HTTP Headers: Configures streaming headers (no-cache, text/plain).
+ * 2. Auth Session Scoping: Extracts signed-in user ID for private context awareness.
+ * 3. API Key Guard: Returns instructive markdown if `GOOGLE_API_KEY` is missing.
+ * 4. Delegation: Hands off execution to `ConversationOrchestrator`.
+ * 5. HTTP Headers: Configures streaming headers (no-cache, text/plain).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerConfig } from "@/server/config/env";
 import { ConversationOrchestrator } from "@/server/chains/conversationOrchestrator";
+import { auth } from "@/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,9 +47,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Parse request payload
-    const body = await req.json();
+    // 2. Parse request payload and check auth session
+    const [body, session] = await Promise.all([
+      req.json(),
+      auth().catch(() => null),
+    ]);
     const { conversationId, messages, model, userProfile } = body;
+    const userId = session?.user?.id;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -62,6 +68,7 @@ export async function POST(req: NextRequest) {
       messages,
       model,
       userProfile,
+      userId,
     });
 
     // 4. Return the live stream to the client

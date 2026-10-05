@@ -4,13 +4,7 @@
  * ==============================================================================
  * Asks the LLM after each chat turn whether there is any new saveable information
  * or user preference to integrate into the user's living profile paragraph.
- * 
- * Flow:
- * 1. Reads the current narrative profile from `localContextDb`.
- * 2. Prompts Gemini with the current profile + the latest interaction.
- * 3. If saveable info is found, Gemini rewrites the profile paragraph smoothly.
- * 4. Saves the updated paragraph back into `localContextDb`.
- * 5. If no saveable info, returns "NO_CHANGE" without modifying the database.
+ * Scoped per user when userId is present.
  */
 
 import { localContextDb } from "../db/localDb";
@@ -21,11 +15,15 @@ export class ProfileUpdater {
   /**
    * Analyzes the conversation turn in the background and updates the user profile paragraph.
    */
-  static async evaluateAndUpdate(userMessage: string, assistantReply?: string): Promise<void> {
+  static async evaluateAndUpdate(
+    userMessage: string,
+    assistantReply?: string,
+    userId?: string
+  ): Promise<void> {
     if (!userMessage || userMessage.trim().length < 5) return;
 
     try {
-      const currentProfileState = await localContextDb.getProfile();
+      const currentProfileState = await localContextDb.getProfile(userId);
       const currentProfile = currentProfileState.profileText || "";
 
       // Quick filter: If message is clearly generic greeting with no content, skip LLM call
@@ -67,7 +65,7 @@ CRITICAL RULES:
       const response = await llm.invoke(prompt);
       const text = typeof response.content === "string" ? response.content.trim() : "";
 
-      // If Gemini synthesized an updated paragraph, save it to the local database!
+      // If Gemini synthesized an updated paragraph, save it to the database!
       if (
         text &&
         text !== "NO_CHANGE" &&
@@ -75,8 +73,8 @@ CRITICAL RULES:
         text.length >= 10 &&
         text.length <= 800
       ) {
-        console.log("[ProfileUpdater] Updated user profile paragraph in localdb:", text);
-        await localContextDb.updateProfile(text);
+        console.log("[ProfileUpdater] Updated user profile paragraph:", text);
+        await localContextDb.updateProfile(text, userId);
       }
     } catch (err) {
       console.warn("[ProfileUpdater] Background profile update skipped:", err);
