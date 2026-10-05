@@ -49,17 +49,39 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onOpenSettings, onOpen
     );
   }
 
-  // Unauthenticated: Show Sign In button
+  // Unauthenticated: Show Sign In button + quick Theme & Settings access
   if (!session?.user) {
     return (
-      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
+      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
         <button
           onClick={onOpenAuth}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 font-medium text-xs transition-colors shadow-xs cursor-pointer"
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 font-medium text-xs transition-colors shadow-xs cursor-pointer"
           type="button"
         >
           <LogIn className="w-4 h-4" />
           <span>Log in or Sign up</span>
+        </button>
+
+        <button
+          onClick={toggleTheme}
+          title={actualTheme === "dark" ? "Switch to Light mode" : "Switch to Dark mode"}
+          className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700/80 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer shrink-0"
+          type="button"
+        >
+          {actualTheme === "dark" ? (
+            <Sun className="w-4 h-4 text-amber-500" />
+          ) : (
+            <Moon className="w-4 h-4 text-purple-500" />
+          )}
+        </button>
+
+        <button
+          onClick={onOpenSettings}
+          title="Settings"
+          className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700/80 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer shrink-0"
+          type="button"
+        >
+          <Settings className="w-4 h-4" />
         </button>
       </div>
     );
