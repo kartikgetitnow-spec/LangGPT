@@ -1,53 +1,64 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import { authMiddleware } from "../middleware/authMiddleware";
+import { DocumentLoader } from "../rag/documentLoader";
+import { vectorStore } from "../rag/vectorStore";
+import { ragPipeline } from "../rag/ragPipeline";
 
 const router = Router();
-const PYTHON_RAG_URL = process.env.PYTHON_RAG_URL || "http://localhost:8000";
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+});
 
-// POST /api/rag/upload - Proxy multipart file upload to Python FastAPI RAG engine
-router.post("/upload", authMiddleware, async (req: Request, res: Response) => {
+/**
+ * POST /api/rag/upload
+ * 1. Authenticates user identity via authMiddleware.
+ * 2. Parses uploaded PDF or text-based document in Node.js.
+ * 3. Chunks text and computes Google Generative AI embeddings.
+ * 4. Persists vector chunks with multi-tenant user/conversation isolation.
+ */
+router.post("/upload", authMiddleware, upload.single("file"), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    // Pipe the raw request stream directly to FastAPI to handle multipart form data efficiently
-    const pythonRes = await fetch(`${PYTHON_RAG_URL}/api/rag/upload`, {
-      method: "POST",
-      headers: {
-        "x-user-id": userId,
-        "x-user-email": req.user?.email || "",
-        "content-type": req.headers["content-type"] || "",
-      },
-      // Node.js 18+ fetch supports body streams (duplex: 'half' for Node runtime)
-      body: req as unknown as BodyInit,
-      // @ts-ignore
-      duplex: "half",
-    });
+    if (!req.file) {
+      return res.status(400).json({ error: "No file was uploaded." });
+    }
 
-    const data = await pythonRes.json();
-    return res.status(pythonRes.status).json(data);
+    const conversationId = (req.body?.conversation_id as string) || "default";
+    const filename = req.file.originalname || "uploaded_doc";
+
+    // Extract text from uploaded file buffer
+    const extractedText = await DocumentLoader.extractText(req.file.buffer, filename);
+
+    // Split, embed, and index into VectorStore
+    const result = await vectorStore.addDocument(extractedText, userId, conversationId, filename);
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully indexed '${filename}' into VectorDB.`,
+      data: result,
+    });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to connect to Python RAG service";
-    console.error("Error proxying /api/rag/upload to Python server:", error);
-    return res.status(502).json({ error: `RAG upload error: ${msg}` });
+    const msg = error instanceof Error ? error.message : "Failed to process and index document";
+    console.error("❌ [RAG Route: Upload Error]:", error);
+    return res.status(500).json({ error: msg });
   }
 });
 
-// POST /api/rag/query - Proxy query to Python FastAPI and stream answer
+/**
+ * POST /api/rag/query
+ * 1. Authenticates user identity.
+ * 2. Retrieves top-k semantically relevant chunks from VectorStore.
+ * 3. Compiles RAG prompt and streams LangChain response back via chunked transfer.
+ */
 router.post("/query", authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const pythonRes = await fetch(`${PYTHON_RAG_URL}/api/rag/query`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": userId,
-        "x-user-email": req.user?.email || "",
-      },
-      body: JSON.stringify(req.body),
-    });
+    const { query, conversation_id = "default", model, top_k = 4 } = req.body || {};
 
-    if (!pythonRes.ok) {
-      const errText = await pythonRes.text();
-      return res.status(pythonRes.status).json({ error: errText });
+    if (!query || typeof query !== "string" || !query.trim()) {
+      return res.status(400).json({ error: "Query string cannot be empty." });
     }
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -55,55 +66,67 @@ router.post("/query", authMiddleware, async (req: Request, res: Response) => {
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
 
-    if (pythonRes.body) {
-      const reader = pythonRes.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(decoder.decode(value, { stream: true }));
-      }
+    const stream = ragPipeline.queryAndStream({
+      query: query.trim(),
+      userId,
+      conversationId: conversation_id,
+      modelName: model,
+      topK: Number(top_k) || 4,
+    });
+
+    for await (const chunk of stream) {
+      res.write(chunk);
     }
+
     return res.end();
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "RAG Query service unavailable";
-    console.error("Error proxying /api/rag/query to Python server:", error);
-    return res.status(502).json({ error: `RAG query error: ${msg}` });
+    const msg = error instanceof Error ? error.message : "RAG Query failed";
+    console.error("❌ [RAG Route: Query Error]:", error);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: msg });
+    }
+    res.write(`\n\n[RAG query error: ${msg}]`);
+    return res.end();
   }
 });
 
-// GET /api/rag/documents - List files indexed in ChromaDB for user
+/**
+ * GET /api/rag/documents
+ * Lists all active files stored in VectorDB for authenticated user.
+ */
 router.get("/documents", authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const convId = req.query.conversation_id ? `?conversation_id=${encodeURIComponent(String(req.query.conversation_id))}` : "";
-    const pythonRes = await fetch(`${PYTHON_RAG_URL}/api/rag/documents${convId}`, {
-      headers: {
-        "x-user-id": userId,
-      },
-    });
-    const data = await pythonRes.json();
-    return res.status(pythonRes.status).json(data);
+    const convId = req.query.conversation_id ? String(req.query.conversation_id) : undefined;
+    const documents = vectorStore.listDocuments(userId, convId);
+    return res.status(200).json({ documents });
   } catch (error: unknown) {
-    return res.status(502).json({ error: "Failed to fetch indexed documents from Python RAG service" });
+    const msg = error instanceof Error ? error.message : "Failed to list documents";
+    console.error("❌ [RAG Route: List Documents Error]:", error);
+    return res.status(500).json({ error: msg });
   }
 });
 
-// DELETE /api/rag/documents/:filename - Remove document vectors from ChromaDB
+/**
+ * DELETE /api/rag/documents/:filename
+ * Removes all vector embeddings for a specific document for authenticated user.
+ */
 router.delete("/documents/:filename", authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const filename = encodeURIComponent(String(req.params.filename));
-    const pythonRes = await fetch(`${PYTHON_RAG_URL}/api/rag/documents/${filename}`, {
-      method: "DELETE",
-      headers: {
-        "x-user-id": userId,
-      },
+    const rawFilename = Array.isArray(req.params.filename) ? req.params.filename[0] : req.params.filename;
+    const filename = decodeURIComponent(String(rawFilename || ""));
+    const convId = req.query.conversation_id ? String(req.query.conversation_id) : undefined;
+
+    const count = await vectorStore.deleteDocument(userId, filename, convId);
+    return res.status(200).json({
+      success: true,
+      message: `Document '${filename}' removed from VectorDB (${count} chunks deleted).`,
     });
-    const data = await pythonRes.json();
-    return res.status(pythonRes.status).json(data);
   } catch (error: unknown) {
-    return res.status(502).json({ error: "Failed to delete document from Python RAG service" });
+    const msg = error instanceof Error ? error.message : "Failed to delete document";
+    console.error("❌ [RAG Route: Delete Document Error]:", error);
+    return res.status(500).json({ error: msg });
   }
 });
 

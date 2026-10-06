@@ -26,6 +26,7 @@ export interface OrchestrationParams {
   model?: string;
   userProfile?: string;
   userId?: string;
+  documentContext?: string;
   signal?: AbortSignal;
 }
 
@@ -63,6 +64,7 @@ export class ConversationOrchestrator {
     model,
     userProfile,
     userId,
+    documentContext,
   }: OrchestrationParams): Promise<ReadableStream<Uint8Array>> {
     // 1. Identify the latest user message
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
@@ -71,21 +73,42 @@ export class ConversationOrchestrator {
     // 2. Retrieve multi-turn history from memory store for this conversation
     const historyMessages = await memoryManager.getMessages(conversationId);
 
-    // 3. Assemble full prompt combining Dynamic Narrative Profile + Memory + Current Turn
+    // 3. Assemble full prompt combining Dynamic Narrative Profile + Memory + Current Turn + RAG
     const promptMessages = await PromptBuilder.buildPromptMessages({
       historyMessages,
       currentTurnMessages: messages,
       customUserProfile: userProfile,
       userId,
+      documentContext,
     });
 
-    // 4. Initialize model from factory
-    const llm = ModelFactory.createGeminiModel({
-      modelName: model,
-    });
+    // 4. Initialize model with automatic quota-exhaustion fallback
+    const defaultModel = process.env.DEFAULT_AI_MODEL || "gemini-2.5-flash-lite";
+    const requestedModel = model || defaultModel;
+    const candidates = Array.from(
+      new Set([requestedModel, defaultModel, "gemini-2.5-flash-lite", "gemini-flash-latest"])
+    );
 
-    // 5. Initiate LangChain stream
-    const modelStream = await llm.stream(promptMessages);
+    let modelStream: any = null;
+    let usedModel = requestedModel;
+
+    for (const candidate of candidates) {
+      try {
+        const llm = ModelFactory.createGeminiModel({ modelName: candidate });
+        modelStream = await llm.stream(promptMessages);
+        usedModel = candidate;
+        break;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("QuotaExceeded");
+        if (isQuota && candidate !== candidates[candidates.length - 1]) {
+          console.warn(`⚠️ [ConversationOrchestrator] Model ${candidate} quota exceeded (429), automatically falling back to next model...`);
+          continue;
+        }
+        throw err;
+      }
+    }
+
     const encoder = new TextEncoder();
 
     let fullAssistantResponse = "";

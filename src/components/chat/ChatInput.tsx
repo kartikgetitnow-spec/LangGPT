@@ -22,6 +22,7 @@ interface ChatInputProps {
   inputPrompt?: string;
   onClearInputPrompt?: () => void;
   onOpenAuth?: () => void;
+  onOpenVoiceModal?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -31,6 +32,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   inputPrompt,
   onClearInputPrompt,
   onOpenAuth,
+  onOpenVoiceModal,
 }) => {
   const { data: session, status } = useSession();
   const [content, setContent] = useState("");
@@ -109,6 +111,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       size: file.size,
       type: file.type,
       url: URL.createObjectURL(file),
+      file: file,
     }));
 
     setAttachments((prev) => [...prev, ...newAttachments]);
@@ -149,7 +152,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   if (status === "unauthenticated") {
     return (
       <div className="w-full max-w-3xl mx-auto px-4 pb-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-100 dark:bg-[#282828] border border-zinc-200 dark:border-zinc-700/80 shadow-md text-center sm:text-left animate-in fade-in duration-200">
+        <div
+          onClick={onOpenAuth}
+          className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-100 dark:bg-[#282828] border border-zinc-200 dark:border-zinc-700/80 shadow-md text-center sm:text-left animate-in fade-in duration-200 cursor-pointer touch-manipulation active:scale-[0.99] transition-transform"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
               <Lock className="w-5 h-5" />
@@ -164,8 +170,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </div>
           </div>
           <button
-            onClick={onOpenAuth}
-            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenAuth?.();
+            }}
+            className="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-sm sm:text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer touch-manipulation min-h-[44px] flex items-center justify-center"
           >
             Log in or Sign up
           </button>
@@ -267,13 +277,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={toggleRecording}
-              title="Voice input"
-              className={`p-2 rounded-full transition-colors ${
-                isRecording
-                  ? "bg-rose-500 text-white animate-pulse"
-                  : "hover:bg-zinc-200 dark:hover:bg-zinc-700/80 text-zinc-600 dark:text-zinc-400"
-              }`}
+              onClick={() => {
+                if (!session?.user) {
+                  onOpenAuth?.();
+                  return;
+                }
+                if (onOpenVoiceModal) {
+                  onOpenVoiceModal();
+                } else {
+                  toggleRecording();
+                }
+              }}
+              title="Gemini Live Voice AI"
+              className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700/80 text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors cursor-pointer"
             >
               <Mic className="w-4 h-4" />
             </button>

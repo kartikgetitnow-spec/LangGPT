@@ -25,21 +25,27 @@ export class ModelFactory {
    * Resolves the proper Google Gemini model name based on client selection.
    */
   static resolveModelName(requested?: string): string {
-    if (!requested) return "gemini-2.5-flash";
+    if (!requested) return process.env.DEFAULT_AI_MODEL || "gemini-2.5-flash-lite";
 
     const normalized = requested.toLowerCase();
 
+    if (normalized.includes("lite")) {
+      return "gemini-2.5-flash-lite";
+    }
     if (normalized.includes("pro")) {
       return "gemini-2.5-pro";
     }
-    if (normalized.includes("2.5") || normalized.includes("latest")) {
-      return requested;
+    if (normalized.includes("flash-latest") || normalized.includes("latest")) {
+      return "gemini-flash-latest";
     }
-    if (normalized.includes("flash")) {
+    if (normalized.includes("2.5-flash")) {
       return "gemini-2.5-flash";
     }
+    if (normalized.includes("flash")) {
+      return "gemini-2.5-flash-lite";
+    }
 
-    return "gemini-2.5-flash";
+    return requested;
   }
 
   /**

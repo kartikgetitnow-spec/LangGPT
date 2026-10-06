@@ -44,10 +44,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     <div className="relative inline-block text-left" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold text-lg transition-colors cursor-pointer"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold text-base sm:text-lg transition-colors cursor-pointer touch-manipulation"
         type="button"
       >
-        <span>{selectedModel.name}</span>
+        <span suppressHydrationWarning>{selectedModel.name}</span>
         <ChevronDown
           className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
             isOpen ? "rotate-180" : ""
@@ -56,7 +56,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-2 w-80 rounded-2xl bg-white dark:bg-[#282828] border border-zinc-200 dark:border-zinc-700 shadow-xl z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl bg-white dark:bg-[#282828] border border-zinc-200 dark:border-zinc-700 shadow-xl z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
           <div className="text-xs font-semibold px-3 py-1.5 text-zinc-400 uppercase tracking-wider">
             Model
           </div>

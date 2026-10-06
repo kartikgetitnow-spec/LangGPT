@@ -167,7 +167,13 @@ export class ChatRepository {
     assistantReply: string;
     model?: string;
   }): Promise<void> {
-    const { conversationId, userId, userPrompt, assistantReply, model = "gemini-2.5-flash" } = params;
+    const {
+      conversationId,
+      userId,
+      userPrompt,
+      assistantReply,
+      model = process.env.DEFAULT_AI_MODEL || "gemini-2.5-flash-lite",
+    } = params;
     const now = new Date();
 
     const userMsg: Message = {

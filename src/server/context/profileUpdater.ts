@@ -26,13 +26,14 @@ export class ProfileUpdater {
       const currentProfileState = await localContextDb.getProfile(userId);
       const currentProfile = currentProfileState.profileText || "";
 
-      // Quick filter: If message is clearly generic greeting with no content, skip LLM call
-      if (/^(hi|hello|hey|test|ping)$/i.test(userMessage.trim())) {
+      // Quick filter: Only evaluate if message appears to contain personal info/preferences
+      const personalTriggers = /\b(i am|my name|i'm|i work|i prefer|call me|my role|my job|my stack|i use|i develop|i like|i live in)\b/i;
+      if (!personalTriggers.test(userMessage)) {
         return;
       }
 
       const llm = ModelFactory.createGeminiModel({
-        modelName: "gemini-2.5-flash",
+        modelName: process.env.PROFILE_SYNTHESIZER_MODEL || process.env.DEFAULT_AI_MODEL || "gemini-2.5-flash-lite",
         temperature: 0.1,
       });
 

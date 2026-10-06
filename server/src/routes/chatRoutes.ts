@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { getServerConfig } from "@/server/config/env";
 import { ConversationOrchestrator } from "@/server/chains/conversationOrchestrator";
+import { vectorStore } from "../rag/vectorStore";
 
 const router = Router();
 
@@ -27,12 +28,40 @@ router.post("/", authMiddleware, async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid request: messages array is required." });
     }
 
+    // Auto-retrieve relevant document context from VectorStore for RAG
+    let documentContext = "";
+    if (userId) {
+      try {
+        const lastUserMsg = [...messages].reverse().find((m: { role: string; content?: string }) => m.role === "user");
+        const userPrompt = lastUserMsg?.content || "";
+        if (userPrompt) {
+          const matchedChunks = await vectorStore.similaritySearch(
+            userPrompt,
+            userId,
+            conversationId,
+            4
+          );
+          if (matchedChunks.length > 0 && matchedChunks[0].similarity > 0.15) {
+            documentContext = matchedChunks
+              .map(
+                (c) =>
+                  `[Source: ${c.metadata.filename} | Chunk ${c.metadata.chunkIndex + 1}]\n${c.content}`
+              )
+              .join("\n\n---\n\n");
+          }
+        }
+      } catch (ragErr) {
+        console.warn("⚠️ [ChatRoute] Error querying RAG vector store:", ragErr);
+      }
+    }
+
     const stream = await ConversationOrchestrator.streamConversation({
       conversationId: conversationId || "default-session",
       messages,
       model,
       userProfile,
       userId,
+      documentContext,
     });
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");

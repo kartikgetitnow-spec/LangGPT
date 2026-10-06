@@ -55,6 +55,7 @@ router.post("/otp/send", async (req: Request, res: Response) => {
       success: true,
       message: `A 6-digit verification code has been sent to ${normalizedEmail}.`,
       devMode: emailResult.devMode || false,
+      devOtp: emailResult.devMode ? otp : undefined,
     });
   } catch (error) {
     console.error("Error in POST /api/auth/otp/send:", error);

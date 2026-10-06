@@ -2,29 +2,29 @@ import { AIModel, Conversation, PromptSuggestion } from "@/types/chat";
 
 export const AVAILABLE_MODELS: AIModel[] = [
   {
+    id: "gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    description: "Ultra-fast response with high daily quota (Recommended for Free Tier)",
+    badge: "Fast & High Quota",
+  },
+  {
+    id: "gemini-flash-latest",
+    name: "Gemini Flash Latest",
+    description: "Production-ready Flash release with high rate limits",
+    badge: "Stable",
+  },
+  {
     id: "gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
-    description: "Fast, versatile, and multimodal with high-speed response times",
+    description: "Advanced multimodal reasoning (Subject to 20 req/day Free Tier limit)",
     badge: "Flash",
   },
   {
     id: "gemini-2.5-pro",
     name: "Gemini 2.5 Pro",
-    description: "Best for complex reasoning, code architecture, math, and deep analysis",
+    description: "Best for complex reasoning, code architecture, and math",
     badge: "Pro",
     isNew: true,
-  },
-  {
-    id: "gemini-flash-latest",
-    name: "Gemini Flash Latest",
-    description: "Always points to the latest production-ready Flash release",
-    badge: "Latest",
-  },
-  {
-    id: "gemini-pro-latest",
-    name: "Gemini Pro Latest",
-    description: "Always points to the latest production-ready Pro release",
-    badge: "Pro",
   },
 ];
 

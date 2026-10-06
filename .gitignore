@@ -30,10 +30,22 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files - strictly ignored, never commit to git
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+server/.env
+server/.env.*
+server/.env.local
+!.env.example
+!server/.env.example
+
+# persistent local fallbacks & secrets
 *auth*.json
 data/*.json
+server/data/*.json
 
 # vercel
 .vercel
@@ -43,8 +55,5 @@ data/*.json
 next-env.d.ts
 
 # Python & VectorDB
-__pycache__/
-*.py[cod]
-server/python/.venv/
-server/python/chroma_db/
-server/python/uploads/
+server/data/*.json
+

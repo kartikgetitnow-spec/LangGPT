@@ -12,7 +12,7 @@
 
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
-import { X, Mail, Lock, ShieldCheck, ArrowRight, Loader2, RefreshCw } from "lucide-react";
+import { X, Mail, Lock, ShieldCheck, ArrowRight, Loader2, RefreshCw, Sparkles } from "lucide-react";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -33,6 +33,31 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [devModeNotice, setDevModeNotice] = useState(false);
 
   if (!isOpen) return null;
+
+  // Handle 1-Tap Quick Guest Sign-In (ideal for mobile / local network testing)
+  const handleQuickGuestSignIn = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await signIn("credentials", {
+        email: "guest@langgpt.com",
+        password: "guest_password_123",
+        otp: "DEV_GUEST",
+        redirect: false,
+      });
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      onClose();
+      window.location.reload();
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to sign in as guest.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle OAuth provider sign-in
   const handleOAuthSignIn = async (provider: "google" | "github") => {
@@ -76,6 +101,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
       setSuccessMsg(data.message);
       setDevModeNotice(!!data.devMode);
+      if (data.devOtp) {
+        setOtp(data.devOtp);
+      }
       setStep("otp");
     } catch (err: unknown) {
       setError((err as Error).message || "An unexpected error occurred.");
@@ -125,12 +153,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 md:p-8 overflow-hidden text-zinc-900 dark:text-zinc-100">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 cursor-pointer touch-manipulation"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 md:p-8 overflow-y-auto max-h-[90vh] text-zinc-900 dark:text-zinc-100 cursor-default"
+      >
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer touch-manipulation"
           aria-label="Close modal"
         >
           <X className="w-5 h-5" />
@@ -175,13 +210,38 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         {step === "credentials" ? (
           <>
+            {/* 1-Tap Quick Guest Sign-In (Instant for Mobile & Dev Testing) */}
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={handleQuickGuestSignIn}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold transition-all shadow-sm cursor-pointer touch-manipulation"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-200" />
+                <span>1-Tap Instant Guest Login</span>
+              </button>
+              <div className="text-[11px] text-zinc-500 dark:text-zinc-400 text-center mt-1.5">
+                Recommended for mobile & LAN testing (zero setup required)
+              </div>
+            </div>
+
+            {/* Visual Divider */}
+            <div className="relative flex items-center justify-center my-3.5">
+              <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+              <span className="bg-white dark:bg-[#181818] px-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                OR SIGN IN WITH
+              </span>
+              <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
+            </div>
+
             {/* OAuth Quick Sign-ins */}
-            <div className="space-y-2.5 mb-5">
+            <div className="space-y-2 mb-3">
               <button
                 type="button"
                 onClick={() => handleOAuthSignIn("google")}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm font-medium transition-colors shadow-xs"
+                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm font-medium transition-colors shadow-xs cursor-pointer touch-manipulation"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path
@@ -208,7 +268,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 type="button"
                 onClick={() => handleOAuthSignIn("github")}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm font-medium transition-colors shadow-xs"
+                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm font-medium transition-colors shadow-xs cursor-pointer touch-manipulation"
               >
                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                   <path
@@ -219,12 +279,16 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 </svg>
                 Continue with GitHub
               </button>
+
+              <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500 text-center leading-tight pt-0.5">
+                (Google/GitHub OAuth redirects to localhost desktop. On phone LAN, use Guest or Email.)
+              </p>
             </div>
 
             {/* Visual Divider */}
-            <div className="relative flex items-center justify-center my-4">
+            <div className="relative flex items-center justify-center my-3">
               <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
-              <span className="bg-white dark:bg-[#181818] px-3 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+              <span className="bg-white dark:bg-[#181818] px-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                 OR EMAIL & PASSWORD
               </span>
               <div className="border-t border-zinc-200 dark:border-zinc-800 w-full" />
@@ -317,6 +381,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         ) : (
           /* STEP 2: OTP VERIFICATION */
           <form onSubmit={handleVerifyOtp} className="space-y-4">
+            {devModeNotice && otp && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs text-center font-medium animate-in fade-in">
+                Dev Mode: Verification code <span className="font-mono font-bold tracking-wider">{otp}</span> has been auto-filled! Tap Verify to continue.
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
                 Enter 6-Digit Code

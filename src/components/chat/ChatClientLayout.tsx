@@ -6,16 +6,19 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { SettingsModal } from "@/components/modals/SettingsModal";
 import { AuthModal } from "@/components/modals/AuthModal";
+import { GeminiLiveModal } from "@/components/voice/GeminiLiveModal";
 import { Conversation } from "@/types/chat";
 
 interface ChatClientLayoutProps {
   initialConversations?: Conversation[];
   initialActiveId?: string | null;
+  initialSelectedModel?: string | null;
 }
 
 export function ChatClientLayout({
   initialConversations = [],
   initialActiveId = null,
+  initialSelectedModel = null,
 }: ChatClientLayoutProps) {
   const {
     conversations,
@@ -32,14 +35,19 @@ export function ChatClientLayout({
     sendMessage,
     stopGeneration,
     regenerateLastMessage,
-  } = useChat({ initialConversations, initialActiveId });
+  } = useChat({ initialConversations, initialActiveId, initialSelectedModel });
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
 
   // Responsive sidebar initial state on screen resize
   useEffect(() => {
+    if (window.innerWidth >= 768) {
+      setIsSidebarOpen(true);
+    }
+
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setIsSidebarOpen(false);
@@ -48,7 +56,6 @@ export function ChatClientLayout({
       }
     };
 
-    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -75,7 +82,7 @@ export function ChatClientLayout({
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-[#212121]">
+    <div className="flex h-[100dvh] w-full max-w-full overflow-hidden bg-white dark:bg-[#212121]">
       {/* LangGPT Collapsible Sidebar */}
       <Sidebar
         conversations={conversations}
@@ -104,6 +111,7 @@ export function ChatClientLayout({
         onRegenerateLast={regenerateLastMessage}
         onNewChat={startNewChat}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
       />
 
       {/* Settings Modal */}
@@ -118,6 +126,13 @@ export function ChatClientLayout({
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+      />
+
+      {/* Gemini Live Voice AI Modal */}
+      <GeminiLiveModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onSendVoiceMessage={async (text) => sendMessage(text, [])}
       />
     </div>
   );

@@ -17,6 +17,7 @@ export interface PromptAssemblyOptions {
   currentTurnMessages: Message[];
   customUserProfile?: string;
   userId?: string;
+  documentContext?: string;
 }
 
 export class PromptBuilder {
@@ -28,11 +29,17 @@ export class PromptBuilder {
     currentTurnMessages,
     customUserProfile,
     userId,
+    documentContext,
   }: PromptAssemblyOptions): Promise<BaseMessage[]> {
     const finalMessages: BaseMessage[] = [];
 
-    // 1. Inject Global Context & Living Narrative User Profile (scoped by userId)
-    const globalInstruction = await buildGlobalContextInstructionAsync(customUserProfile, userId);
+    // 1. Inject Global Context, Living Narrative User Profile, and RAG Document Context into a single SystemMessage
+    let globalInstruction = await buildGlobalContextInstructionAsync(customUserProfile, userId);
+
+    if (documentContext && documentContext.trim()) {
+      globalInstruction += `\n\n=== RETRIEVED CONTEXT FROM UPLOADED DOCUMENTS (RAG) ===\n${documentContext}\n=======================================================\nGuidelines for using retrieved documents:\n- Use the provided document context above to answer the user's questions accurately.\n- Always cite the source filename (e.g. [Source: filename.pdf | Chunk 1]) when referencing facts from the documents.`;
+    }
+
     finalMessages.push(new SystemMessage(globalInstruction));
 
     // 2. Inject Historical Memory Messages (if any)

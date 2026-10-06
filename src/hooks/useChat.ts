@@ -21,11 +21,13 @@ const MODEL_KEY = "langgpt_selected_model";
 export interface UseChatOptions {
   initialConversations?: Conversation[];
   initialActiveId?: string | null;
+  initialSelectedModel?: string | null;
 }
 
 export function useChat({
   initialConversations = [],
   initialActiveId = null,
+  initialSelectedModel = null,
 }: UseChatOptions = {}) {
   const { status } = useSession();
 
@@ -36,7 +38,12 @@ export function useChat({
     if (initialConversations.length > 0) return initialConversations[0].id;
     return null;
   });
-  const [selectedModel, setSelectedModel] = useState<string>(AVAILABLE_MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (initialSelectedModel && AVAILABLE_MODELS.some((m) => m.id === initialSelectedModel)) {
+      return initialSelectedModel;
+    }
+    return AVAILABLE_MODELS[0].id;
+  });
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -47,9 +54,11 @@ export function useChat({
     setIsMounted(true);
 
     try {
-      const savedModel = localStorage.getItem(MODEL_KEY);
-      if (savedModel && AVAILABLE_MODELS.some((m) => m.id === savedModel)) {
-        setSelectedModel(savedModel);
+      if (!initialSelectedModel) {
+        const savedModel = localStorage.getItem(MODEL_KEY);
+        if (savedModel && AVAILABLE_MODELS.some((m) => m.id === savedModel)) {
+          setSelectedModel(savedModel);
+        }
       }
     } catch {}
 
@@ -129,6 +138,7 @@ export function useChat({
   // Persist selected model
   useEffect(() => {
     if (!isMounted) return;
+    document.cookie = `langgpt_selected_model=${encodeURIComponent(selectedModel)}; path=/; max-age=31536000; SameSite=Lax`;
     try {
       localStorage.setItem(MODEL_KEY, selectedModel);
     } catch (e) {
@@ -301,74 +311,99 @@ export function useChat({
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
-      try {
-        await streamChatResponse({
-          conversationId: targetConvId,
-          messages: [
-            ...(activeConversation?.messages || []),
-            userMessage,
-          ],
-          model: selectedModel,
-          signal: abortController.signal,
-          onChunk: (chunk: string) => {
-            setConversations((prev) =>
-              prev.map((conv) => {
-                if (conv.id !== targetConvId) return conv;
-                return {
-                  ...conv,
-                  messages: conv.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? { ...m, content: m.content + chunk }
-                      : m
-                  ),
-                };
-              })
-            );
-          },
-          onFinish: () => {
-            setIsGenerating(false);
-            abortControllerRef.current = null;
-            setConversations((prev) =>
-              prev.map((conv) => {
-                if (conv.id !== targetConvId) return conv;
-                return {
-                  ...conv,
-                  messages: conv.messages.map((m) =>
-                    m.id === assistantMsgId ? { ...m, isStreaming: false } : m
-                  ),
-                };
-              })
-            );
-          },
-          onError: (err) => {
-            console.error("Stream generation error:", err);
-            setIsGenerating(false);
-            abortControllerRef.current = null;
-            setConversations((prev) =>
-              prev.map((conv) => {
-                if (conv.id !== targetConvId) return conv;
-                return {
-                  ...conv,
-                  messages: conv.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? {
-                          ...m,
-                          content:
-                            m.content ||
-                            `Error: ${err.message || "Unable to reach backend. Please ensure your backend server is running."}`,
-                          isStreaming: false,
-                        }
-                      : m
-                  ),
-                };
-              })
-            );
-          },
-        });
-      } catch (e) {
-        console.error("Error in sendMessage:", e);
-        setIsGenerating(false);
+      // Automatically upload and index attached documents into RAG VectorDB
+      const uploadableFiles = attachments.filter((a) => a.file);
+      if (uploadableFiles.length > 0) {
+        await Promise.all(
+          uploadableFiles.map(async (att) => {
+            try {
+              const formData = new FormData();
+              formData.append("file", att.file!);
+              formData.append("conversation_id", targetConvId);
+              await fetch("/api/rag/upload", {
+                method: "POST",
+                body: formData,
+              });
+            } catch (upErr) {
+              console.warn("Failed to index attachment into RAG:", upErr);
+            }
+          })
+        );
       }
+
+      return new Promise<string>(async (resolve) => {
+        try {
+          await streamChatResponse({
+            conversationId: targetConvId,
+            messages: [
+              ...(activeConversation?.messages || []),
+              userMessage,
+            ],
+            model: selectedModel,
+            signal: abortController.signal,
+            onChunk: (chunk: string) => {
+              setConversations((prev) =>
+                prev.map((conv) => {
+                  if (conv.id !== targetConvId) return conv;
+                  return {
+                    ...conv,
+                    messages: conv.messages.map((m) =>
+                      m.id === assistantMsgId
+                        ? { ...m, content: m.content + chunk }
+                        : m
+                    ),
+                  };
+                })
+              );
+            },
+            onFinish: (fullText: string) => {
+              setIsGenerating(false);
+              abortControllerRef.current = null;
+              setConversations((prev) =>
+                prev.map((conv) => {
+                  if (conv.id !== targetConvId) return conv;
+                  return {
+                    ...conv,
+                    messages: conv.messages.map((m) =>
+                      m.id === assistantMsgId ? { ...m, isStreaming: false } : m
+                    ),
+                  };
+                })
+              );
+              resolve(fullText || "");
+            },
+            onError: (err) => {
+              console.error("Stream generation error:", err);
+              setIsGenerating(false);
+              abortControllerRef.current = null;
+              setConversations((prev) =>
+                prev.map((conv) => {
+                  if (conv.id !== targetConvId) return conv;
+                  return {
+                    ...conv,
+                    messages: conv.messages.map((m) =>
+                      m.id === assistantMsgId
+                        ? {
+                            ...m,
+                            content:
+                              m.content ||
+                              `Error: ${err.message || "Unable to reach backend. Please ensure your backend server is running."}`,
+                            isStreaming: false,
+                          }
+                        : m
+                    ),
+                  };
+                })
+              );
+              resolve("");
+            },
+          });
+        } catch (e) {
+          console.error("Error in sendMessage:", e);
+          setIsGenerating(false);
+          resolve("");
+        }
+      });
     },
     [currentConversationId, isGenerating, selectedModel, activeConversation]
   );

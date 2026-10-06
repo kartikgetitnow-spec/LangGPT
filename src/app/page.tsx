@@ -8,6 +8,7 @@ export default async function Home() {
   const session = await auth().catch(() => null);
   const cookieStore = await cookies();
   const activeIdCookie = cookieStore.get("langgpt_active_id")?.value || null;
+  const selectedModelCookie = cookieStore.get("langgpt_selected_model")?.value || null;
 
   let initialConversations: Conversation[] = [];
   let initialActiveId: string | null = null;
@@ -34,6 +35,7 @@ export default async function Home() {
     <ChatClientLayout
       initialConversations={initialConversations}
       initialActiveId={initialActiveId}
+      initialSelectedModel={selectedModelCookie}
     />
   );
 }

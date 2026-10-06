@@ -24,7 +24,7 @@ export function getServerConfig(): ServerConfig {
   return {
     googleApiKey,
     // Default model to use when client does not specify one
-    defaultModel: process.env.DEFAULT_AI_MODEL || "gemini-2.5-flash",
+    defaultModel: process.env.DEFAULT_AI_MODEL || "gemini-2.5-flash-lite",
     // Balanced creativity and coherence
     defaultTemperature: 0.7,
     // Output token capacity

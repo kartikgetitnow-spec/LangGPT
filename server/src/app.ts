@@ -15,6 +15,7 @@ import conversationRoutes from "./routes/conversationRoutes";
 import contextRoutes from "./routes/contextRoutes";
 import authRoutes from "./routes/authRoutes";
 import ragRoutes from "./routes/ragRoutes";
+import voiceRoutes from "./routes/voiceRoutes";
 
 export const app = express();
 
@@ -45,6 +46,7 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/context", contextRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/rag", ragRoutes);
+app.use("/api/voice", voiceRoutes);
 
 // Fallback 404
 app.use((_req, res) => {

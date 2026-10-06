@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
-import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/components/providers/AuthProvider";
@@ -26,6 +25,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#212121" },
@@ -50,22 +52,7 @@ export default async function RootLayout({
       style={{ colorScheme: isDark ? "dark" : "light" }}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased ${isDark ? "dark" : ""}`}
     >
-      <body className="h-full w-full overflow-hidden flex flex-col bg-white dark:bg-[#212121] text-zinc-900 dark:text-zinc-100">
-        <Script id="theme-init" strategy="beforeInteractive">
-          {`
-            try {
-              var theme = localStorage.getItem('langgpt_theme') || 'dark';
-              var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-              if (isDark) {
-                document.documentElement.classList.add('dark');
-                document.documentElement.style.colorScheme = 'dark';
-              } else {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.style.colorScheme = 'light';
-              }
-            } catch (e) {}
-          `}
-        </Script>
+      <body className="h-[100dvh] w-full overflow-hidden flex flex-col bg-white dark:bg-[#212121] text-zinc-900 dark:text-zinc-100 touch-manipulation">
         <AuthProvider session={session}>
           <ThemeProvider initialTheme={initialTheme}>{children}</ThemeProvider>
         </AuthProvider>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PanelLeft, SquarePen, Share, ShieldAlert } from "lucide-react";
+import { PanelLeft, SquarePen, Share, ShieldAlert, Radio } from "lucide-react";
 import { Conversation, Attachment } from "@/types/chat";
 import { ModelSelector } from "./ModelSelector";
 import { MessageList } from "./MessageList";
@@ -20,6 +20,7 @@ interface ChatAreaProps {
   onRegenerateLast: () => void;
   onNewChat: () => void;
   onOpenAuth: () => void;
+  onOpenVoiceModal?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -34,6 +35,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onRegenerateLast,
   onNewChat,
   onOpenAuth,
+  onOpenVoiceModal,
 }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<string | undefined>();
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
@@ -71,7 +73,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {!isSidebarOpen && (
             <button
               onClick={onToggleSidebar}
-              className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+              className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer touch-manipulation"
               title="Open sidebar"
               type="button"
             >
@@ -95,10 +97,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           )}
 
+          {/* Gemini Live Voice Mode Header Button */}
+          {onOpenVoiceModal && (
+            <button
+              onClick={onOpenVoiceModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 text-zinc-800 dark:text-zinc-200 text-xs font-semibold transition-all cursor-pointer shadow-xs touch-manipulation"
+              title="Activate Gemini Live Voice AI"
+              type="button"
+            >
+              <Radio className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+              <span className="hidden sm:inline">Live Voice</span>
+            </button>
+          )}
+
           {hasMessages && (
             <button
               onClick={handleShare}
-              className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+              className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer touch-manipulation"
               title="Share chat"
               type="button"
             >
@@ -109,7 +124,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {!isSidebarOpen && (
             <button
               onClick={onNewChat}
-              className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+              className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer touch-manipulation"
               title="New chat"
               type="button"
             >
@@ -120,7 +135,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </header>
 
       {/* Main Conversation Feed or Welcome Empty State */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-y-auto relative overscroll-contain">
         {hasMessages ? (
           <MessageList
             messages={messages}
@@ -142,6 +157,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         inputPrompt={selectedPrompt}
         onClearInputPrompt={() => setSelectedPrompt(undefined)}
         onOpenAuth={onOpenAuth}
+        onOpenVoiceModal={onOpenVoiceModal}
       />
     </main>
   );

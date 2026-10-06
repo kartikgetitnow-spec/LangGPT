@@ -50,19 +50,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )
     : conversations;
 
+  const handleNewChat = () => {
+    onNewChat();
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      onToggle();
+    }
+  };
+
   return (
     <>
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
           onClick={onToggle}
-          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-xs transition-opacity"
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            onToggle();
+          }}
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-xs transition-opacity cursor-pointer touch-manipulation"
+          role="button"
+          tabIndex={0}
+          aria-label="Close sidebar backdrop"
         />
       )}
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 flex flex-col w-[260px] bg-zinc-50 dark:bg-[#171717] border-r border-zinc-200 dark:border-zinc-800 transition-transform duration-300 ease-in-out ${
+        className={`fixed md:static inset-y-0 left-0 z-50 md:z-30 flex flex-col w-[280px] sm:w-[260px] bg-zinc-50 dark:bg-[#171717] border-r border-zinc-200 dark:border-zinc-800 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none touch-manipulation ${
           isOpen ? "translate-x-0" : "-translate-x-full md:-ml-[260px]"
         }`}
       >
@@ -88,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <button
-              onClick={onNewChat}
+              onClick={handleNewChat}
               className="p-2 rounded-xl hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
               title="New chat"
               type="button"
@@ -118,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* New Chat Primary Button */}
         <div className="px-3 pb-2">
           <button
-            onClick={onNewChat}
+            onClick={handleNewChat}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-zinc-200/70 dark:hover:bg-zinc-800/70 text-zinc-800 dark:text-zinc-200 text-xs font-semibold transition-colors cursor-pointer border border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
             type="button"
           >
