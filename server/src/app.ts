@@ -33,6 +33,26 @@ app.use(cookieParser());
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
+// Root Public Endpoint
+app.get("/", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "LangGPT Node.js Backend Server",
+    message: "LangGPT Backend API is live and publicly accessible.",
+    endpoints: {
+      health: "/health",
+      diagnostics_and_errors: "/error",
+      chat: "/api/chat",
+      conversations: "/api/conversations",
+      context: "/api/context",
+      auth: "/api/auth",
+      rag: "/api/rag",
+      voice: "/api/voice",
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Health Check
 app.get("/health", (_req, res) => {
   res.json({
