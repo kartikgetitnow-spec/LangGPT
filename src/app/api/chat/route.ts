@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
+const BACKEND_URL = (process.env.BACKEND_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 export async function POST(req: NextRequest) {
   try {
