@@ -19,12 +19,21 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   let token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   // 3. NextAuth session cookie
+  let tokenCookieName = "";
   if (!token && req.cookies) {
-    token =
-      req.cookies["authjs.session-token"] ||
-      req.cookies["__Secure-authjs.session-token"] ||
-      req.cookies["next-auth.session-token"] ||
-      req.cookies["__Secure-next-auth.session-token"];
+    const candidateNames = [
+      "authjs.session-token",
+      "__Secure-authjs.session-token",
+      "next-auth.session-token",
+      "__Secure-next-auth.session-token",
+    ];
+    for (const name of candidateNames) {
+      if (req.cookies[name]) {
+        token = req.cookies[name];
+        tokenCookieName = name;
+        break;
+      }
+    }
   }
 
   if (token) {
@@ -33,9 +42,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         process.env.AUTH_SECRET ||
         process.env.NEXTAUTH_SECRET ||
         "fallback_auth_secret_for_development";
-      const salt = req.cookies?.["__Secure-authjs.session-token"]
-        ? "__Secure-authjs.session-token"
-        : "authjs.session-token";
+      const salt = tokenCookieName || "authjs.session-token";
 
       const decoded = await decode({
         token,

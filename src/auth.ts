@@ -20,6 +20,14 @@ import { createSafePrismaAdapter } from "@/server/db/safeAdapter";
 import { verifyOtpCode } from "@/server/auth/otpService";
 import { rotateTokenIfNeeded } from "@/server/auth/tokenRefresh";
 
+// Robust cookie handling for mobile phones (HTTP LAN) and desktop browsers (localhost & HTTPS)
+const isHttps =
+  process.env.NODE_ENV === "production" &&
+  (Boolean(process.env.NEXTAUTH_URL?.startsWith("https://")) ||
+    Boolean(process.env.AUTH_URL?.startsWith("https://")));
+const useSecureCookies = Boolean(isHttps);
+const cookiePrefix = useSecureCookies ? "__Secure-" : "";
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   adapter: createSafePrismaAdapter(prisma),
@@ -27,10 +35,59 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  cookies: {
+    sessionToken: {
+      name: `${cookiePrefix}authjs.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    callbackUrl: {
+      name: `${cookiePrefix}authjs.callback-url`,
+      options: {
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    csrfToken: {
+      name: `${useSecureCookies ? "__Host-" : ""}authjs.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    pkceCodeVerifier: {
+      name: `${cookiePrefix}authjs.pkce.code_verifier`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+        maxAge: 900,
+      },
+    },
+    state: {
+      name: `${cookiePrefix}authjs.state`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+        maxAge: 900,
+      },
+    },
+  },
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      checks: ["state"], // Use robust state verification to prevent mobile PKCE cookie loss
       authorization: {
         params: {
           prompt: "consent",
@@ -42,6 +99,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     GitHub({
       clientId: process.env.GITHUB_ID,
       clientSecret: process.env.GITHUB_SECRET,
+      checks: ["state"],
     }),
     Credentials({
       name: "Email and Password with OTP",
@@ -155,6 +213,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   pages: {
     signIn: "/", // We use an in-app interactive modal
+    error: "/", // Gracefully redirect back to home app instead of raw nextauth error page
   },
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
 });

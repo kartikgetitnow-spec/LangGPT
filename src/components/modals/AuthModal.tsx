@@ -32,6 +32,30 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [devModeNotice, setDevModeNotice] = useState(false);
 
+  // Capture auth errors from URL (e.g. redirected from OAuth failure or configuration error)
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlError = params.get("error");
+      if (urlError) {
+        if (urlError === "Configuration") {
+          setError(
+            "OAuth session expired or cookies were blocked across domains. You can try again or use the 1-Tap Instant Guest Login."
+          );
+        } else if (urlError === "AccessDenied") {
+          setError("Access was denied by the OAuth provider.");
+        } else if (urlError === "Verification") {
+          setError("Verification token has expired or has already been used.");
+        } else {
+          setError(`Authentication notice: ${urlError}`);
+        }
+        // Clean URL parameters gracefully without reload
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   // Handle 1-Tap Quick Guest Sign-In (ideal for mobile / local network testing)
@@ -159,6 +183,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
         className="relative w-full max-w-md bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 md:p-8 overflow-y-auto max-h-[90vh] text-zinc-900 dark:text-zinc-100 cursor-default"
       >
         {/* Close Button */}

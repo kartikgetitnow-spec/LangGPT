@@ -60,6 +60,16 @@ export function ChatClientLayout({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Automatically open AuthModal if error parameter is present in URL
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("error")) {
+        setIsAuthModalOpen(true);
+      }
+    }
+  }, []);
+
   // Keyboard shortcut listener (Ctrl+Shift+O for new chat)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
