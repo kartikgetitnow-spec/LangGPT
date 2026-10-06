@@ -316,6 +316,29 @@ export class VectorStoreManager {
 
     return deletedCount;
   }
+
+  /**
+   * Returns telemetry stats about stored vector chunks.
+   */
+  getStats(): {
+    totalChunks: number;
+    uniqueUsers: number;
+    uniqueConversations: number;
+    persistPath: string;
+  } {
+    const users = new Set<string>();
+    const convs = new Set<string>();
+    for (const chunk of this.chunks.values()) {
+      if (chunk.metadata?.userId) users.add(chunk.metadata.userId);
+      if (chunk.metadata?.conversationId) convs.add(chunk.metadata.conversationId);
+    }
+    return {
+      totalChunks: this.chunks.size,
+      uniqueUsers: users.size,
+      uniqueConversations: convs.size,
+      persistPath: this.persistPath,
+    };
+  }
 }
 
 export const vectorStore = new VectorStoreManager();

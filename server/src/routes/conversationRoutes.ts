@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { ChatRepository } from "@/server/db/chatRepository";
+import { DiagnosticService } from "../services/diagnosticService";
 
 const router = Router();
 
@@ -12,6 +13,16 @@ router.get("/", authMiddleware, async (req: Request, res: Response) => {
     res.json(conversations);
   } catch (error) {
     console.error("Error in GET /api/conversations:", error);
+    DiagnosticService.logError({
+      category: "DATABASE",
+      severity: "ERROR",
+      message: `Failed to fetch user conversations: ${(error as Error).message}`,
+      error,
+      endpoint: "/api/conversations",
+      method: "GET",
+      userId: req.user?.id,
+      suggestion: "Check PostgreSQL connectivity or verify DATABASE_URL credentials and Prisma migrations.",
+    });
     res.status(500).json({ error: "Failed to fetch conversations" });
   }
 });
@@ -24,6 +35,15 @@ router.delete("/", authMiddleware, async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (error) {
     console.error("Error in DELETE /api/conversations:", error);
+    DiagnosticService.logError({
+      category: "DATABASE",
+      severity: "ERROR",
+      message: `Failed to clear conversations: ${(error as Error).message}`,
+      error,
+      endpoint: "/api/conversations",
+      method: "DELETE",
+      userId: req.user?.id,
+    });
     res.status(500).json({ error: "Failed to clear conversations" });
   }
 });
@@ -36,6 +56,15 @@ router.get("/:id", authMiddleware, async (req: Request, res: Response) => {
     res.json(messages);
   } catch (error) {
     console.error("Error in GET /api/conversations/:id:", error);
+    DiagnosticService.logError({
+      category: "DATABASE",
+      severity: "ERROR",
+      message: `Failed to fetch conversation messages: ${(error as Error).message}`,
+      error,
+      endpoint: `/api/conversations/${req.params.id}`,
+      method: "GET",
+      userId: req.user?.id,
+    });
     res.status(500).json({ error: "Failed to fetch messages" });
   }
 });

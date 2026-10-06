@@ -3,6 +3,7 @@ import { authMiddleware } from "../middleware/authMiddleware";
 import { getServerConfig } from "@/server/config/env";
 import { ConversationOrchestrator } from "@/server/chains/conversationOrchestrator";
 import { vectorStore } from "../rag/vectorStore";
+import { DiagnosticService } from "../services/diagnosticService";
 
 const router = Router();
 
@@ -82,6 +83,28 @@ router.post("/", authMiddleware, async (req: Request, res: Response) => {
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : "Internal Server Error";
     console.error("Error in Express POST /api/chat:", error);
+
+    const isRateLimit = errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("ResourceExhausted");
+    const isAuthErr = errorMsg.includes("API key not valid") || errorMsg.includes("API_KEY_INVALID");
+
+    DiagnosticService.logError({
+      category: isRateLimit || isAuthErr ? "AI_MODEL" : "SYSTEM",
+      severity: isRateLimit ? "WARNING" : "ERROR",
+      message: `Chat streaming error: ${errorMsg}`,
+      error,
+      endpoint: "/api/chat",
+      method: "POST",
+      userId: req.user?.id,
+      details: {
+        modelRequested: req.body?.model,
+      },
+      suggestion: isRateLimit
+        ? "Gemini API rate limit or quota exceeded. Consider switching model to gemini-2.5-flash or waiting for quota reset."
+        : isAuthErr
+        ? "Google Gemini API key appears invalid or expired. Verify GOOGLE_API_KEY in server/.env."
+        : "Verify network connectivity to Google Generative AI servers.",
+    });
+
     if (!res.headersSent) {
       res.status(500).json({ error: errorMsg });
     } else {

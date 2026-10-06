@@ -16,13 +16,15 @@ import contextRoutes from "./routes/contextRoutes";
 import authRoutes from "./routes/authRoutes";
 import ragRoutes from "./routes/ragRoutes";
 import voiceRoutes from "./routes/voiceRoutes";
+import errorRoutes from "./routes/errorRoutes";
+import { DiagnosticService } from "./services/diagnosticService";
 
 export const app = express();
 
-// Enable CORS for Next.js frontend (port 3000)
+// Enable CORS for Next.js frontend, public IP, and Vercel deployments
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+    origin: (_origin, callback) => callback(null, true),
     credentials: true,
   })
 );
@@ -40,6 +42,10 @@ app.get("/health", (_req, res) => {
   });
 });
 
+// Mount Error & Diagnostic Routes
+app.use("/error", errorRoutes);
+app.use("/api/error", errorRoutes);
+
 // Mount API routes
 app.use("/api/chat", chatRoutes);
 app.use("/api/conversations", conversationRoutes);
@@ -47,6 +53,29 @@ app.use("/api/context", contextRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/rag", ragRoutes);
 app.use("/api/voice", voiceRoutes);
+
+// Global Error Handler Middleware
+app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const errorObj = err instanceof Error ? err : new Error(String(err));
+  console.error("Unhandled Backend Exception:", errorObj);
+
+  DiagnosticService.logError({
+    category: "SYSTEM",
+    severity: "CRITICAL",
+    message: errorObj.message || "Unhandled server error",
+    error: errorObj,
+    endpoint: req.originalUrl || req.url,
+    method: req.method,
+    ip: (req.headers["x-forwarded-for"] as string) || req.ip,
+  });
+
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: errorObj.message || "An unexpected error occurred on the LangGPT backend.",
+    });
+  }
+});
 
 // Fallback 404
 app.use((_req, res) => {

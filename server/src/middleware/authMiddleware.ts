@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { decode } from "next-auth/jwt";
+import { DiagnosticService } from "../services/diagnosticService";
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   // 1. Direct header injected by Next.js proxy/rewrites
@@ -49,10 +50,51 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
           name: decoded.name as string | undefined,
         };
         return next();
+      } else {
+        DiagnosticService.logError({
+          category: "AUTH",
+          severity: "WARNING",
+          message: `JWT token decode failed (invalid signature or expired token) on ${req.method} ${req.originalUrl || req.url}`,
+          endpoint: req.originalUrl || req.url,
+          method: req.method,
+          ip: (req.headers["x-forwarded-for"] as string) || req.ip,
+          details: {
+            tokenSnippet: token ? `${token.slice(0, 10)}...` : undefined,
+            saltUsed: salt,
+            hasAuthSecret: Boolean(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET),
+          },
+          suggestion: "AUTH_SECRET on client and server must be identical. If on phone/different IP, check if cookies are cross-domain blocked.",
+        });
       }
     } catch (err) {
       console.warn("Token decode verification failed:", err);
+      DiagnosticService.logError({
+        category: "AUTH",
+        severity: "ERROR",
+        message: `Token decode error: ${(err as Error).message}`,
+        error: err,
+        endpoint: req.originalUrl || req.url,
+        method: req.method,
+        ip: (req.headers["x-forwarded-for"] as string) || req.ip,
+      });
     }
+  } else {
+    // Missing credentials
+    DiagnosticService.logError({
+      category: "AUTH",
+      severity: "WARNING",
+      message: `Unauthorized access: No session token or proxy user header provided for ${req.method} ${req.originalUrl || req.url}`,
+      endpoint: req.originalUrl || req.url,
+      method: req.method,
+      ip: (req.headers["x-forwarded-for"] as string) || req.ip,
+      details: {
+        hasCookies: Boolean(req.cookies && Object.keys(req.cookies).length > 0),
+        cookieKeys: req.cookies ? Object.keys(req.cookies) : [],
+        hasAuthHeader: Boolean(authHeader),
+        userAgent: req.headers["user-agent"],
+      },
+      suggestion: "If logging in from phone, ensure cookies can be set over HTTPS, or send 'Authorization: Bearer <token>' in API requests.",
+    });
   }
 
   return res.status(401).json({
